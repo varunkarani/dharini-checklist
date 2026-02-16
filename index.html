@@ -50,30 +50,31 @@ const BOARD_ID = "dharini-global-board";
 const TIMEZONE = "Asia/Kolkata";
 const CEFHUM_END = "2026-02-20";
 
+let selectedDate = getISTDate();
+
 /* ================= HELPERS ================= */
 
-function todayIST(){
-  const now = new Date();
+function getISTDate(dateObj=null){
+  const now = dateObj || new Date();
   const ist = new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
   return ist.toISOString().split("T")[0];
 }
 
-function isSunday(){
-  const now = new Date();
-  const ist = new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
-  return ist.getDay() === 0;
+function shiftDay(days){
+  const d = new Date(selectedDate);
+  d.setDate(d.getDate()+days);
+  selectedDate = getISTDate(d);
+  loadDay();
 }
 
 function afterEnd(date){
   return date > CEFHUM_END;
 }
 
-const today = todayIST();
-
-const docRef = db.collection("boards")
-  .doc(BOARD_ID)
-  .collection("days")
-  .doc(today);
+function isSunday(date){
+  const d = new Date(date);
+  return d.getDay() === 0;
+}
 
 /* ================= CHECKLIST STRUCTURE ================= */
 
@@ -89,7 +90,7 @@ tasks:[
 {
 title:"After Breakfast",
 tasks:[
-{ id:"ab_cefhum", text:"Cefhum", show:()=>!afterEnd(today)},
+{ id:"ab_cefhum", text:"Cefhum", show:(date)=>!afterEnd(date)},
 { id:"ab_metxl", text:"Met XL"},
 { id:"ab_nikoran", text:"Nikoran"},
 { id:"ab_lasilactone", text:"Lasilactone"},
@@ -97,7 +98,7 @@ tasks:[
 { id:"ab_folic", text:"Folic Acid"},
 { id:"ab_ivabred", text:"Ivabred"},
 { id:"ab_dolo", text:"Dolo (optional)"},
-{ id:"ab_vitd", text:"Vit D (Sunday only)", show:()=>isSunday()}
+{ id:"ab_vitd", text:"Vit D (Sunday only)", show:(date)=>isSunday(date)}
 ]},
 {
 title:"Before Lunch",
@@ -122,7 +123,7 @@ tasks:[
 {
 title:"After Dinner Meds",
 tasks:[
-{ id:"ad_cefhum", text:"Cefhum", show:()=>!afterEnd(today)},
+{ id:"ad_cefhum", text:"Cefhum", show:(date)=>!afterEnd(date)},
 { id:"ad_halfmet", text:"½ Met XL"},
 { id:"ad_nikoran", text:"Nikoran"},
 { id:"ad_ivabred", text:"Ivabred"}
@@ -138,9 +139,43 @@ tasks:[
 ]}
 ];
 
-/* ================= RENDER ================= */
+/* ================= NAVIGATION BAR ================= */
 
-function render(data){
+const nav = document.createElement("div");
+nav.style.marginBottom="16px";
+nav.innerHTML=`
+<button onclick="shiftDay(-1)">◀ Previous</button>
+<input type="date" id="datePicker">
+<button onclick="shiftDay(1)">Next ▶</button>
+`;
+document.body.insertBefore(nav, document.body.firstChild);
+
+document.getElementById("datePicker").value = selectedDate;
+document.getElementById("datePicker").onchange = (e)=>{
+  selectedDate = e.target.value;
+  loadDay();
+};
+
+/* ================= LOAD & RENDER ================= */
+
+let unsubscribe = null;
+
+function loadDay(){
+  if(unsubscribe) unsubscribe();
+
+  document.getElementById("datePicker").value = selectedDate;
+
+  const docRef = db.collection("boards")
+    .doc(BOARD_ID)
+    .collection("days")
+    .doc(selectedDate);
+
+  unsubscribe = docRef.onSnapshot(doc=>{
+    render(doc.data()||{}, docRef);
+  });
+}
+
+function render(data, docRef){
 
   const app = document.getElementById("app");
   app.innerHTML="";
@@ -156,7 +191,7 @@ function render(data){
     card.appendChild(title);
 
     block.tasks.forEach(task=>{
-      if(task.show && !task.show()) return;
+      if(task.show && !task.show(selectedDate)) return;
 
       total++;
       const taskDiv=document.createElement("div");
@@ -165,7 +200,6 @@ function render(data){
       const cb=document.createElement("input");
       cb.type="checkbox";
       cb.checked=data?.[task.id]?.done||false;
-
       if(cb.checked) done++;
 
       cb.onchange=()=>{
@@ -176,47 +210,6 @@ function render(data){
 
       taskDiv.appendChild(cb);
       taskDiv.append(" "+task.text);
-
-      if(task.type==="bp"){
-        const sys=document.createElement("input");
-        sys.placeholder="Sys";
-        const dia=document.createElement("input");
-        dia.placeholder="Dia";
-        const save=document.createElement("button");
-        save.textContent="Save";
-        save.onclick=()=>{
-          docRef.set({
-            [task.id]:{
-              done:true,
-              sys:sys.value,
-              dia:dia.value
-            }
-          },{merge:true});
-        };
-        taskDiv.appendChild(document.createElement("br"));
-        taskDiv.appendChild(sys);
-        taskDiv.appendChild(dia);
-        taskDiv.appendChild(save);
-      }
-
-      if(task.type==="sugar"){
-        const val=document.createElement("input");
-        val.placeholder="Sugar";
-        const save=document.createElement("button");
-        save.textContent="Save";
-        save.onclick=()=>{
-          docRef.set({
-            [task.id]:{
-              done:true,
-              value:val.value
-            }
-          },{merge:true});
-        };
-        taskDiv.appendChild(document.createElement("br"));
-        taskDiv.appendChild(val);
-        taskDiv.appendChild(save);
-      }
-
       card.appendChild(taskDiv);
     });
 
@@ -225,12 +218,10 @@ function render(data){
 
   const percent=Math.round((done/total)*100)||0;
   document.getElementById("bar").style.width=percent+"%";
-  document.getElementById("percent").textContent=percent+"% Complete Today";
+  document.getElementById("percent").textContent=percent+"% Complete ("+selectedDate+")";
 }
 
-docRef.onSnapshot(doc=>{
-  render(doc.data());
-});
+loadDay();
 </script>
 
 </body>
