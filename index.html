@@ -67,14 +67,8 @@ function shiftDay(days){
   loadDay();
 }
 
-function afterEnd(date){
-  return date > CEFHUM_END;
-}
-
-function isSunday(date){
-  const d = new Date(date);
-  return d.getDay() === 0;
-}
+function afterEnd(date){ return date > CEFHUM_END; }
+function isSunday(date){ return new Date(date).getDay()===0; }
 
 /* ================= CHECKLIST STRUCTURE ================= */
 
@@ -150,34 +144,33 @@ nav.innerHTML=`
 `;
 document.body.insertBefore(nav, document.body.firstChild);
 
-document.getElementById("datePicker").value = selectedDate;
-document.getElementById("datePicker").onchange = (e)=>{
-  selectedDate = e.target.value;
-  loadDay();
-};
-
 /* ================= LOAD & RENDER ================= */
 
-let unsubscribe = null;
+let unsubscribe=null;
 
 function loadDay(){
+
   if(unsubscribe) unsubscribe();
 
-  document.getElementById("datePicker").value = selectedDate;
+  document.getElementById("datePicker").value=selectedDate;
+  document.getElementById("datePicker").onchange=(e)=>{
+    selectedDate=e.target.value;
+    loadDay();
+  };
 
-  const docRef = db.collection("boards")
+  const docRef=db.collection("boards")
     .doc(BOARD_ID)
     .collection("days")
     .doc(selectedDate);
 
-  unsubscribe = docRef.onSnapshot(doc=>{
+  unsubscribe=docRef.onSnapshot(doc=>{
     render(doc.data()||{}, docRef);
   });
 }
 
 function render(data, docRef){
 
-  const app = document.getElementById("app");
+  const app=document.getElementById("app");
   app.innerHTML="";
   let total=0, done=0;
 
@@ -194,8 +187,8 @@ function render(data, docRef){
       if(task.show && !task.show(selectedDate)) return;
 
       total++;
-      const taskDiv=document.createElement("div");
-      taskDiv.className="task";
+      const row=document.createElement("div");
+      row.className="task";
 
       const cb=document.createElement("input");
       cb.type="checkbox";
@@ -204,13 +197,64 @@ function render(data, docRef){
 
       cb.onchange=()=>{
         docRef.set({
-          [task.id]:{done:cb.checked}
+          [task.id]:{...data?.[task.id], done:cb.checked}
         },{merge:true});
       };
 
-      taskDiv.appendChild(cb);
-      taskDiv.append(" "+task.text);
-      card.appendChild(taskDiv);
+      row.appendChild(cb);
+      row.append(" "+task.text);
+
+      /* ===== BP INPUT ===== */
+      if(task.type==="bp"){
+        const sys=document.createElement("input");
+        sys.placeholder="Sys";
+        sys.value=data?.[task.id]?.sys||"";
+
+        const dia=document.createElement("input");
+        dia.placeholder="Dia";
+        dia.value=data?.[task.id]?.dia||"";
+
+        const save=document.createElement("button");
+        save.textContent="Save BP";
+        save.onclick=()=>{
+          docRef.set({
+            [task.id]:{
+              done:true,
+              sys:sys.value,
+              dia:dia.value
+            }
+          },{merge:true});
+        };
+
+        row.appendChild(document.createElement("br"));
+        row.appendChild(sys);
+        row.appendChild(dia);
+        row.appendChild(save);
+      }
+
+      /* ===== SUGAR INPUT ===== */
+      if(task.type==="sugar"){
+        const val=document.createElement("input");
+        val.placeholder="Sugar";
+        val.value=data?.[task.id]?.value||"";
+
+        const save=document.createElement("button");
+        save.textContent="Save Sugar";
+        save.onclick=()=>{
+          docRef.set({
+            [task.id]:{
+              done:true,
+              value:val.value
+            }
+          },{merge:true});
+        };
+
+        row.appendChild(document.createElement("br"));
+        row.appendChild(val);
+        row.appendChild(save);
+      }
+
+      card.appendChild(row);
     });
 
     app.appendChild(card);
@@ -218,7 +262,8 @@ function render(data, docRef){
 
   const percent=Math.round((done/total)*100)||0;
   document.getElementById("bar").style.width=percent+"%";
-  document.getElementById("percent").textContent=percent+"% Complete ("+selectedDate+")";
+  document.getElementById("percent").textContent=
+    percent+"% Complete ("+selectedDate+")";
 }
 
 loadDay();
