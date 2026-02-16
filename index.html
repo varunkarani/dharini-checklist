@@ -567,7 +567,7 @@ function render(data){
 
   const percent = total ? Math.round((done/total)*100) : 0;
   document.getElementById("bar").style.width = percent + "%";
-  document.getElementById("percent").textContent = "";
+ document.getElementById("percent").textContent = percent + "% Complete";
 }
 
 /* ================= COMMENTS ================= */
