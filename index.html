@@ -26,6 +26,15 @@
   box-sizing: border-box;
   display: block;
 }
+  .chartWrap{
+  height: 260px;          /* change to 220/300 if you want */
+  width: 100%;
+}
+canvas{
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
   --bg:#f6f7fb;
   --card:#ffffff;
   --text:#0f172a;
@@ -165,9 +174,9 @@ button:disabled{opacity:.55}
     </select>
     <span class="small">Shows the selected slot across the last 30 days.</span>
   </div>
-  <canvas id="bpChart"></canvas>
-  <div style="height:10px"></div>
-  <canvas id="sugarChart"></canvas>
+  <div class="chartWrap"><canvas id="bpChart"></canvas></div>
+<div style="height:12px"></div>
+<div class="chartWrap"><canvas id="sugarChart"></canvas></div>
 </div>
 
 <div class="card">
@@ -681,26 +690,28 @@ async function loadTrends(){
       { label:"Pulse", data: pulseData }
     ]},
     options:{
-      responsive:true,
-      plugins:{legend:{labels:{color:textCol}}},
-      scales:{
-        x:{ticks:{color:textCol},grid:{color:gridCol}},
-        y:{ticks:{color:textCol},grid:{color:gridCol}}
-      }
-    }
+  responsive:true,
+  maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:textCol}}},
+  scales:{
+    x:{ticks:{color:textCol},grid:{color:gridCol}},
+    y:{ticks:{color:textCol},grid:{color:gridCol}}
+  }
+}
   });
 
   sugarChart = new Chart(document.getElementById("sugarChart"),{
     type:"line",
     data:{ labels, datasets:[ { label:"Sugar", data: sugarData } ] },
     options:{
-      responsive:true,
-      plugins:{legend:{labels:{color:textCol}}},
-      scales:{
-        x:{ticks:{color:textCol},grid:{color:gridCol}},
-        y:{ticks:{color:textCol},grid:{color:gridCol}}
-      }
-    }
+  responsive:true,
+  maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:textCol}}},
+  scales:{
+    x:{ticks:{color:textCol},grid:{color:gridCol}},
+    y:{ticks:{color:textCol},grid:{color:gridCol}}
+  }
+}
   });
 }
 
