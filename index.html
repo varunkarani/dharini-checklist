@@ -17,6 +17,8 @@ input{padding:6px;border-radius:6px;border:1px solid #ddd;margin-top:4px}
 .progress div{height:100%;background:#2f6fed;width:0%}
 .small{font-size:12px;opacity:.7}
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
 </head>
 
 <body>
@@ -30,6 +32,7 @@ input{padding:6px;border-radius:6px;border:1px solid #ddd;margin-top:4px}
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
+
 /* ================= FIREBASE CONFIG ================= */
 
 const firebaseConfig = {
@@ -49,7 +52,6 @@ const db = firebase.firestore();
 const BOARD_ID = "dharini-global-board";
 const TIMEZONE = "Asia/Kolkata";
 const CEFHUM_END = "2026-02-20";
-
 let selectedDate = getISTDate();
 
 /* ================= HELPERS ================= */
@@ -70,81 +72,44 @@ function shiftDay(days){
 function afterEnd(date){ return date > CEFHUM_END; }
 function isSunday(date){ return new Date(date).getDay()===0; }
 
-/* ================= CHECKLIST STRUCTURE ================= */
+/* ================= NAVIGATION ================= */
 
-const blocks = [
-{
-title:"Before Breakfast",
-tasks:[
-{ id:"bb_bp", text:"Measure BP", type:"bp"},
-{ id:"bb_sugar", text:"Measure Sugar", type:"sugar"},
-{ id:"bb_novo10", text:"Novorapid 10u"},
-{ id:"bb_panD", text:"Pan D"}
-]},
-{
-title:"After Breakfast",
-tasks:[
-{ id:"ab_cefhum", text:"Cefhum", show:(date)=>!afterEnd(date)},
-{ id:"ab_metxl", text:"Met XL"},
-{ id:"ab_nikoran", text:"Nikoran"},
-{ id:"ab_lasilactone", text:"Lasilactone"},
-{ id:"ab_cobadex", text:"Cobadex"},
-{ id:"ab_folic", text:"Folic Acid"},
-{ id:"ab_ivabred", text:"Ivabred"},
-{ id:"ab_dolo", text:"Dolo (optional)"},
-{ id:"ab_vitd", text:"Vit D (Sunday only)", show:(date)=>isSunday(date)}
-]},
-{
-title:"Before Lunch",
-tasks:[
-{ id:"bl_bp", text:"Measure BP", type:"bp"},
-{ id:"bl_sugar", text:"Measure Sugar", type:"sugar"},
-{ id:"bl_novo12", text:"Novorapid 12u"}
-]},
-{
-title:"After Lunch",
-tasks:[
-{ id:"al_ecosprin", text:"Ecosprin"},
-{ id:"al_clopitab", text:"Clopitab"}
-]},
-{
-title:"Before Dinner",
-tasks:[
-{ id:"bd_bp", text:"Measure BP", type:"bp"},
-{ id:"bd_sugar", text:"Measure Sugar", type:"sugar"},
-{ id:"bd_novo7", text:"Novorapid 7u"}
-]},
-{
-title:"After Dinner Meds",
-tasks:[
-{ id:"ad_cefhum", text:"Cefhum", show:(date)=>!afterEnd(date)},
-{ id:"ad_halfmet", text:"½ Met XL"},
-{ id:"ad_nikoran", text:"Nikoran"},
-{ id:"ad_ivabred", text:"Ivabred"}
-]},
-{
-title:"2 Hours After Dinner",
-tasks:[
-{ id:"2h_bp", text:"Measure BP", type:"bp"},
-{ id:"2h_sugar", text:"Measure Sugar", type:"sugar"},
-{ id:"2h_tresiba", text:"Tresiba 16u"},
-{ id:"2h_dolo", text:"Dolo (if pain)"},
-{ id:"2h_rosuva", text:"Rosuvastatin"}
-]}
-];
-
-/* ================= NAVIGATION BAR ================= */
-
-const nav = document.createElement("div");
+const nav=document.createElement("div");
 nav.style.marginBottom="16px";
 nav.innerHTML=`
 <button onclick="shiftDay(-1)">◀ Previous</button>
 <input type="date" id="datePicker">
 <button onclick="shiftDay(1)">Next ▶</button>
 `;
-document.body.insertBefore(nav, document.body.firstChild);
+document.body.insertBefore(nav,document.body.firstChild);
 
-/* ================= LOAD & RENDER ================= */
+/* ================= CHECKLIST STRUCTURE ================= */
+
+const blocks=[
+{
+title:"Before Breakfast",
+tasks:[
+{id:"bb_bp",text:"Measure BP",type:"bp"},
+{id:"bb_sugar",text:"Measure Sugar",type:"sugar"},
+{id:"bb_novo10",text:"Novorapid 10u"},
+{id:"bb_panD",text:"Pan D"}
+]},
+{
+title:"After Breakfast",
+tasks:[
+{id:"ab_cefhum",text:"Cefhum",show:(d)=>!afterEnd(d)},
+{id:"ab_metxl",text:"Met XL"},
+{id:"ab_nikoran",text:"Nikoran"},
+{id:"ab_lasilactone",text:"Lasilactone"},
+{id:"ab_cobadex",text:"Cobadex"},
+{id:"ab_folic",text:"Folic Acid"},
+{id:"ab_ivabred",text:"Ivabred"},
+{id:"ab_dolo",text:"Dolo (optional)"},
+{id:"ab_vitd",text:"Vit D (Sunday only)",show:(d)=>isSunday(d)}
+]}
+];
+
+/* ================= LOAD DAY ================= */
 
 let unsubscribe=null;
 
@@ -164,15 +129,19 @@ function loadDay(){
     .doc(selectedDate);
 
   unsubscribe=docRef.onSnapshot(doc=>{
-    render(doc.data()||{}, docRef);
+    render(doc.data()||{},docRef);
   });
+
+  loadTrends();
 }
 
-function render(data, docRef){
+/* ================= RENDER ================= */
+
+function render(data,docRef){
 
   const app=document.getElementById("app");
   app.innerHTML="";
-  let total=0, done=0;
+  let total=0,done=0;
 
   blocks.forEach(block=>{
     const card=document.createElement("div");
@@ -188,7 +157,6 @@ function render(data, docRef){
 
       total++;
       const row=document.createElement("div");
-      row.className="task";
 
       const cb=document.createElement("input");
       cb.type="checkbox";
@@ -197,14 +165,13 @@ function render(data, docRef){
 
       cb.onchange=()=>{
         docRef.set({
-          [task.id]:{...data?.[task.id], done:cb.checked}
+          [task.id]:{...data?.[task.id],done:cb.checked}
         },{merge:true});
       };
 
       row.appendChild(cb);
       row.append(" "+task.text);
 
-      /* ===== BP INPUT ===== */
       if(task.type==="bp"){
         const sys=document.createElement("input");
         sys.placeholder="Sys";
@@ -220,8 +187,8 @@ function render(data, docRef){
           docRef.set({
             [task.id]:{
               done:true,
-              sys:sys.value,
-              dia:dia.value
+              sys:parseInt(sys.value),
+              dia:parseInt(dia.value)
             }
           },{merge:true});
         };
@@ -232,7 +199,6 @@ function render(data, docRef){
         row.appendChild(save);
       }
 
-      /* ===== SUGAR INPUT ===== */
       if(task.type==="sugar"){
         const val=document.createElement("input");
         val.placeholder="Sugar";
@@ -244,7 +210,7 @@ function render(data, docRef){
           docRef.set({
             [task.id]:{
               done:true,
-              value:val.value
+              value:parseFloat(val.value)
             }
           },{merge:true});
         };
@@ -262,11 +228,62 @@ function render(data, docRef){
 
   const percent=Math.round((done/total)*100)||0;
   document.getElementById("bar").style.width=percent+"%";
-  document.getElementById("percent").textContent=
-    percent+"% Complete ("+selectedDate+")";
+  document.getElementById("percent").textContent=percent+"% Complete ("+selectedDate+")";
+}
+
+/* ================= TRENDS ================= */
+
+async function loadTrends(){
+
+  const trendSection=document.createElement("div");
+  trendSection.className="card";
+  trendSection.innerHTML="<h3>Trends (Last 30 Days)</h3><canvas id='bpChart'></canvas><canvas id='sugarChart'></canvas>";
+  document.getElementById("app").appendChild(trendSection);
+
+  const snapshot=await db.collection("boards")
+    .doc(BOARD_ID)
+    .collection("days")
+    .orderBy(firebase.firestore.FieldPath.documentId())
+    .limitToLast(30)
+    .get();
+
+  const labels=[];
+  const sysData=[];
+  const diaData=[];
+  const sugarData=[];
+
+  snapshot.forEach(doc=>{
+    const d=doc.data();
+    labels.push(doc.id);
+    sysData.push(d?.bb_bp?.sys||null);
+    diaData.push(d?.bb_bp?.dia||null);
+    sugarData.push(d?.bb_sugar?.value||null);
+  });
+
+  new Chart(document.getElementById("bpChart"),{
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:"Systolic",data:sysData,borderColor:"red"},
+        {label:"Diastolic",data:diaData,borderColor:"blue"}
+      ]
+    }
+  });
+
+  new Chart(document.getElementById("sugarChart"),{
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:"Sugar",data:sugarData,borderColor:"green"}
+      ]
+    }
+  });
 }
 
 loadDay();
+
 </script>
 
 </body>
