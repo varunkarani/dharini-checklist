@@ -6,20 +6,29 @@
 <title>Dharini Daily Checklist</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <style>
 body{font-family:system-ui;background:#f6f7fb;margin:0;padding:16px}
 h2{margin-top:0}
-.nav{margin-bottom:16px}
+.nav{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
 .blockTitle{font-weight:900;margin-bottom:10px}
 .task{margin-bottom:12px}
 input{padding:6px;border-radius:6px;border:1px solid #ddd;margin:4px}
-button{padding:6px 10px;border-radius:6px;border:0;background:#2f6fed;color:#fff;font-weight:700}
+button{padding:8px 12px;border-radius:8px;border:0;background:#2f6fed;color:#fff;font-weight:800}
+button.ghost{background:#eef0f6;color:#111}
 .progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:8px}
 .progress div{height:100%;background:#2f6fed;width:0%}
+.small{font-size:12px;opacity:.75}
+hr{border:none;border-top:1px solid #eee;margin:12px 0}
+table{width:100%;border-collapse:collapse}
+td,th{border:1px solid #ddd;padding:8px;font-size:12px;vertical-align:top}
+th{background:#f5f5f5;text-align:left}
+.pdfWrap{background:#fff;padding:16px}
+.badge{display:inline-block;background:#111;color:#fff;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800}
 </style>
 </head>
 
@@ -28,9 +37,9 @@ button{padding:6px 10px;border-radius:6px;border:0;background:#2f6fed;color:#fff
 <h2>Dharini Daily Checklist</h2>
 
 <div class="nav">
-<button onclick="shiftDay(-1)">◀ Previous</button>
-<input type="date" id="datePicker">
-<button onclick="shiftDay(1)">Next ▶</button>
+  <button onclick="shiftDay(-1)">◀ Previous</button>
+  <input type="date" id="datePicker">
+  <button onclick="shiftDay(1)">Next ▶</button>
 </div>
 
 <div class="progress"><div id="bar"></div></div>
@@ -39,13 +48,25 @@ button{padding:6px 10px;border-radius:6px;border:0;background:#2f6fed;color:#fff
 <div id="app"></div>
 
 <div class="card">
-<h3>Trends (Last 30 Days)</h3>
-<canvas id="bpChart"></canvas>
-<canvas id="sugarChart"></canvas>
+  <h3>Trends (Last 30 Days)</h3>
+  <canvas id="bpChart"></canvas>
+  <canvas id="sugarChart"></canvas>
 </div>
 
-<script>
+<div class="card">
+  <h3>Export</h3>
+  <div class="small">Tip: “All previous days” can be heavy on iPad if you have a lot of days. If it fails, use Last 30 Days.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <button onclick="exportSelectedDayPDF()">Export Selected Day (PDF)</button>
+    <button class="ghost" onclick="exportSelectedPlusPreviousPDF()">Export Selected + All Previous (PDF)</button>
+    <button class="ghost" onclick="exportLastNDaysPDF(30)">Export Last 30 Days (PDF)</button>
+  </div>
+</div>
 
+<!-- Hidden container for PDF rendering -->
+<div id="pdfContainer" style="position:absolute;left:-99999px;top:-99999px;width:800px"></div>
+
+<script>
 /* ================= FIREBASE ================= */
 
 const firebaseConfig = {
@@ -84,6 +105,27 @@ function shiftDay(days){
 
 function afterEnd(date){return date>CEFHUM_END;}
 function isSunday(date){return new Date(date).getDay()===0;}
+
+function visibleTasksForDate(block, date){
+  return block.tasks.filter(t => !t.show || t.show(date));
+}
+
+function calcCompletionForDate(data, date){
+  let total=0, done=0;
+  blocks.forEach(b=>{
+    visibleTasksForDate(b,date).forEach(t=>{
+      total++;
+      if(data?.[t.id]?.done) done++;
+    });
+  });
+  const percent = total ? Math.round((done/total)*100) : 0;
+  return { total, done, percent };
+}
+
+function safeNum(x){
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
 
 /* ================= FULL CHECKLIST ================= */
 
@@ -153,7 +195,6 @@ tasks:[
 let unsubscribe=null;
 
 function loadDay(){
-
   if(unsubscribe)unsubscribe();
 
   document.getElementById("datePicker").value=selectedDate;
@@ -170,7 +211,7 @@ function loadDay(){
   loadTrends();
 }
 
-/* ================= RENDER ================= */
+/* ================= RENDER UI ================= */
 
 function render(data,docRef){
 
@@ -187,10 +228,9 @@ function render(data,docRef){
     title.textContent=block.title;
     card.appendChild(title);
 
-    block.tasks.forEach(task=>{
-      if(task.show && !task.show(selectedDate))return;
-
+    visibleTasksForDate(block, selectedDate).forEach(task=>{
       total++;
+
       const row=document.createElement("div");
       row.className="task";
 
@@ -223,8 +263,8 @@ function render(data,docRef){
           docRef.set({
             [task.id]:{
               done:true,
-              sys:parseInt(sys.value)||"",
-              dia:parseInt(dia.value)||""
+              sys:sys.value,
+              dia:dia.value
             }
           },{merge:true});
         };
@@ -233,6 +273,10 @@ function render(data,docRef){
         row.appendChild(sys);
         row.appendChild(dia);
         row.appendChild(save);
+
+        const last = (data?.[task.id]?.sys && data?.[task.id]?.dia) ? `${data[task.id].sys}/${data[task.id].dia}` : "—";
+        row.appendChild(document.createElement("br"));
+        row.appendChild(smallText("Saved: "+last));
       }
 
       if(task.type==="sugar"){
@@ -246,7 +290,7 @@ function render(data,docRef){
           docRef.set({
             [task.id]:{
               done:true,
-              value:parseFloat(val.value)||""
+              value:val.value
             }
           },{merge:true});
         };
@@ -254,6 +298,10 @@ function render(data,docRef){
         row.appendChild(document.createElement("br"));
         row.appendChild(val);
         row.appendChild(save);
+
+        const last = data?.[task.id]?.value ? data[task.id].value : "—";
+        row.appendChild(document.createElement("br"));
+        row.appendChild(smallText("Saved: "+last));
       }
 
       card.appendChild(row);
@@ -264,11 +312,20 @@ function render(data,docRef){
 
   const percent=Math.round((done/total)*100)||0;
   document.getElementById("bar").style.width=percent+"%";
-  document.getElementById("percent").textContent=
-    percent+"% Complete ("+selectedDate+")";
+  document.getElementById("percent").textContent=percent+"% Complete ("+selectedDate+")";
+}
+
+function smallText(t){
+  const s=document.createElement("div");
+  s.className="small";
+  s.textContent=t;
+  return s;
 }
 
 /* ================= TRENDS ================= */
+
+let bpChart = null;
+let sugarChart = null;
 
 async function loadTrends(){
 
@@ -287,32 +344,164 @@ async function loadTrends(){
   snapshot.forEach(doc=>{
     const d=doc.data();
     labels.push(doc.id);
-    sys.push(d?.bb_bp?.sys||null);
-    dia.push(d?.bb_bp?.dia||null);
-    sugar.push(d?.bb_sugar?.value||null);
+
+    // Prefer bb_bp/bb_sugar as the "morning baseline"
+    sys.push(safeNum(d?.bb_bp?.sys));
+    dia.push(safeNum(d?.bb_bp?.dia));
+    sugar.push(safeNum(d?.bb_sugar?.value));
   });
 
-  new Chart(document.getElementById("bpChart"),{
+  if(bpChart) bpChart.destroy();
+  if(sugarChart) sugarChart.destroy();
+
+  bpChart = new Chart(document.getElementById("bpChart"),{
     type:"line",
     data:{
       labels,
       datasets:[
-        {label:"Systolic",data:sys,borderColor:"red"},
-        {label:"Diastolic",data:dia,borderColor:"blue"}
+        {label:"Systolic",data:sys},
+        {label:"Diastolic",data:dia}
       ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:true}}
     }
   });
 
-  new Chart(document.getElementById("sugarChart"),{
+  sugarChart = new Chart(document.getElementById("sugarChart"),{
     type:"line",
     data:{
       labels,
       datasets:[
-        {label:"Sugar",data:sugar,borderColor:"green"}
+        {label:"Sugar",data:sugar}
       ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:true}}
     }
   });
 }
+
+/* ================= PDF EXPORT ================= */
+
+async function fetchDayDoc(date){
+  const doc = await db.collection("boards").doc(BOARD_ID).collection("days").doc(date).get();
+  return { date, data: doc.exists ? doc.data() : {} };
+}
+
+function buildDayTableHTML(dayObj){
+  const date = dayObj.date;
+  const data = dayObj.data || {};
+  const c = calcCompletionForDate(data, date);
+
+  let html = `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h3 style="margin:0;">${date}</h3>
+        <span class="badge">${c.percent}% complete</span>
+      </div>
+      <div class="small">Done: ${c.done} / ${c.total}</div>
+      <hr/>
+  `;
+
+  blocks.forEach(block=>{
+    const tasks = visibleTasksForDate(block, date);
+    html += `<h4 style="margin:10px 0 6px;">${block.title}</h4>`;
+    html += `<table><tr><th>Task</th><th>Status</th><th>Reading</th></tr>`;
+
+    tasks.forEach(t=>{
+      const entry = data?.[t.id] || {};
+      const status = entry.done ? "Done" : "Not done";
+
+      let reading = "";
+      if(t.type === "bp"){
+        reading = (entry.sys && entry.dia) ? `${entry.sys}/${entry.dia}` : "";
+      }
+      if(t.type === "sugar"){
+        reading = entry.value ? `${entry.value}` : "";
+      }
+
+      html += `<tr>
+        <td>${t.text}</td>
+        <td>${status}</td>
+        <td>${reading || ""}</td>
+      </tr>`;
+    });
+
+    html += `</table>`;
+  });
+
+  html += `</div>`;
+  return html;
+}
+
+async function exportSelectedDayPDF(){
+  const day = await fetchDayDoc(selectedDate);
+  await exportDaysToPDF([day], `Dharini_${selectedDate}.pdf`);
+}
+
+async function exportSelectedPlusPreviousPDF(){
+  // Fetch all docs up to selectedDate
+  // Note: documentId is YYYY-MM-DD so lexicographic ordering works.
+  const snap = await db.collection("boards").doc(BOARD_ID).collection("days")
+    .orderBy(firebase.firestore.FieldPath.documentId())
+    .endAt(selectedDate)
+    .get();
+
+  const days = [];
+  snap.forEach(doc => days.push({ date: doc.id, data: doc.data() }));
+
+  await exportDaysToPDF(days, `Dharini_Upto_${selectedDate}.pdf`);
+}
+
+async function exportLastNDaysPDF(n){
+  const snap = await db.collection("boards").doc(BOARD_ID).collection("days")
+    .orderBy(firebase.firestore.FieldPath.documentId())
+    .limitToLast(n)
+    .get();
+
+  const days = [];
+  snap.forEach(doc => days.push({ date: doc.id, data: doc.data() }));
+
+  const first = days.length ? days[0].date : "start";
+  await exportDaysToPDF(days, `Dharini_${first}_to_${selectedDate}_Last${n}.pdf`);
+}
+
+async function exportDaysToPDF(days, filename){
+  const container = document.getElementById("pdfContainer");
+  container.innerHTML = "";
+
+  const wrap = document.createElement("div");
+  wrap.className = "pdfWrap";
+
+  wrap.innerHTML = `
+    <h2 style="margin-top:0;">Dharini Checklist Report</h2>
+    <div class="small">Generated: ${new Date().toLocaleString()}</div>
+    <div class="small">Report includes: ${days.length} day(s)</div>
+    <hr/>
+  `;
+
+  for(const day of days){
+    wrap.innerHTML += buildDayTableHTML(day);
+  }
+
+  container.appendChild(wrap);
+
+  const opt = {
+    margin:       10,
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.95 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['css', 'legacy'] }
+  };
+
+  await html2pdf().set(opt).from(wrap).save();
+}
+
+/* ================= BOOT ================= */
 
 document.getElementById("datePicker").onchange=e=>{
   selectedDate=e.target.value;
@@ -320,7 +509,6 @@ document.getElementById("datePicker").onchange=e=>{
 };
 
 loadDay();
-
 </script>
 
 </body>
