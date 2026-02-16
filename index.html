@@ -6,9 +6,14 @@
 <title>Dharini Daily Checklist</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
+<!-- Reliable PDF generation (data-driven, not screenshot-driven) -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
 
 <style>
 body{font-family:system-ui;background:#f6f7fb;margin:0;padding:16px}
@@ -20,15 +25,11 @@ h2{margin:0 0 12px 0}
 input,textarea{padding:8px;border-radius:8px;border:1px solid #ddd;margin:4px}
 button,.btn{padding:10px 14px;border-radius:10px;border:0;background:#2f6fed;color:#fff;font-weight:800;display:inline-block;text-decoration:none}
 button.ghost,.btn.ghost{background:#eef0f6;color:#111}
+button:disabled{opacity:.55}
 .progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:8px}
 .progress div{height:100%;background:#2f6fed;width:0%}
 .small{font-size:12px;opacity:.75}
 hr{border:none;border-top:1px solid #eee;margin:12px 0}
-.badge{display:inline-block;background:#111;color:#fff;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800}
-table{width:100%;border-collapse:collapse}
-td,th{border:1px solid #ddd;padding:8px;font-size:12px;vertical-align:top}
-th{background:#f5f5f5;text-align:left}
-.pdfWrap{background:#fff;padding:16px}
 .rowActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style>
 </head>
@@ -42,7 +43,7 @@ th{background:#f5f5f5;text-align:left}
   <input type="date" id="datePicker">
   <button onclick="shiftDay(1)">Next ▶</button>
 
-  <!-- Install Shortcut (Option B) -->
+  <!-- Shortcut install link -->
   <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
     Add Reminders to phone
   </a>
@@ -70,11 +71,12 @@ th{background:#f5f5f5;text-align:left}
 
 <div class="card">
   <h3 style="margin:0 0 8px 0;">Export</h3>
-  <div class="small">Tip: “Up to selected” can get heavy on iPhone/iPad if you have many days. If it fails, export last 30 days.</div>
+  <div class="small">
+    Exports all entries from <b>Feb 14, 2026</b> onwards up to the selected date (inclusive), including all BP/Sugar readings and Comments.
+  </div>
   <div class="rowActions" style="margin-top:10px">
-    <button onclick="exportSelectedDayPDF()">Export Selected Day (PDF)</button>
-    <button class="ghost" onclick="exportSelectedPlusPreviousPDF()">Export Up To Selected (PDF)</button>
-    <button class="ghost" onclick="exportLastNDaysPDF(30)">Export Last 30 Days (PDF)</button>
+    <button id="exportBtn" onclick="exportToPDF()">Export to PDF</button>
+    <span class="small" id="exportStatus"></span>
   </div>
 </div>
 
@@ -84,9 +86,6 @@ th{background:#f5f5f5;text-align:left}
     <span id="lastEditedValue">—</span>
   </div>
 </div>
-
-<!-- Hidden container for PDF rendering -->
-<div id="pdfContainer" style="position:absolute;left:-99999px;top:-99999px;width:800px"></div>
 
 <script>
 /* ================= FIREBASE ================= */
@@ -108,6 +107,7 @@ const db = firebase.firestore();
 const BOARD_ID="dharini-global-board";
 const TIMEZONE="Asia/Kolkata";
 const CEFHUM_END="2026-02-20";
+const EXPORT_START_DATE="2026-02-14"; // inclusive
 
 let selectedDate = getISTDate();
 let activeDocRef = null;
@@ -135,15 +135,6 @@ function isSunday(date){ return new Date(date).getDay() === 0; }
 function safeNum(x){
   const n = Number(x);
   return Number.isFinite(n) ? n : null;
-}
-
-function escapeHtml(str){
-  return String(str)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
 }
 
 function updateLastEdited(){
@@ -244,18 +235,6 @@ function visibleTasksForDate(block, date){
   return block.tasks.filter(t => !t.show || t.show(date));
 }
 
-function calcCompletionForDate(data, date){
-  let total = 0, done = 0;
-  blocks.forEach(b=>{
-    visibleTasksForDate(b, date).forEach(t=>{
-      total++;
-      if(data?.[t.id]?.done) done++;
-    });
-  });
-  const percent = total ? Math.round((done/total)*100) : 0;
-  return { total, done, percent };
-}
-
 /* ================= LOAD DAY ================= */
 
 function loadDay(){
@@ -351,13 +330,6 @@ function render(data){
         row.appendChild(dia);
         row.appendChild(pulse);
         row.appendChild(save);
-
-        const entry = data?.[task.id] || {};
-        const last = (entry.sys && entry.dia)
-          ? `${entry.sys}/${entry.dia}` + (entry.pulse ? ` (Pulse ${entry.pulse})` : "")
-          : "—";
-        row.appendChild(document.createElement("br"));
-        row.appendChild(smallText("Saved: " + last));
       }
 
       if(task.type === "sugar"){
@@ -381,11 +353,6 @@ function render(data){
         row.appendChild(document.createElement("br"));
         row.appendChild(val);
         row.appendChild(save);
-
-        const entry = data?.[task.id] || {};
-        const last = entry.value ? `${entry.value}` : "—";
-        row.appendChild(document.createElement("br"));
-        row.appendChild(smallText("Saved: " + last));
       }
 
       card.appendChild(row);
@@ -397,13 +364,6 @@ function render(data){
   const percent = total ? Math.round((done/total)*100) : 0;
   document.getElementById("bar").style.width = percent + "%";
   document.getElementById("percent").textContent = percent + "% Complete (" + selectedDate + ")";
-}
-
-function smallText(t){
-  const s = document.createElement("div");
-  s.className = "small";
-  s.textContent = t;
-  return s;
 }
 
 /* ================= COMMENTS ================= */
@@ -468,7 +428,6 @@ async function loadTrends(){
   snapshot.forEach(doc=>{
     const d = doc.data();
     labels.push(doc.id);
-
     sysData.push(safeNum(d?.bb_bp?.sys));
     diaData.push(safeNum(d?.bb_bp?.dia));
     pulseData.push(safeNum(d?.bb_bp?.pulse));
@@ -488,151 +447,189 @@ async function loadTrends(){
         { label:"Pulse", data: pulseData }
       ]
     },
-    options:{
-      responsive:true,
-      plugins:{legend:{display:true}}
-    }
+    options:{ responsive:true, plugins:{legend:{display:true}} }
   });
 
   sugarChart = new Chart(document.getElementById("sugarChart"),{
     type:"line",
-    data:{
-      labels,
-      datasets:[
-        { label:"Sugar", data: sugarData }
-      ]
-    },
-    options:{
-      responsive:true,
-      plugins:{legend:{display:true}}
-    }
+    data:{ labels, datasets:[ { label:"Sugar", data: sugarData } ] },
+    options:{ responsive:true, plugins:{legend:{display:true}} }
   });
 }
 
-/* ================= PDF EXPORT ================= */
+/* ================= EXPORT (RECODED, RELIABLE) ================= */
 
-async function fetchDayDoc(date){
-  const doc = await db.collection("boards").doc(BOARD_ID).collection("days").doc(date).get();
-  return { date, data: doc.exists ? doc.data() : {} };
+const BP_SLOTS = [
+  { label: "Before Breakfast", id: "bb_bp" },
+  { label: "Before Lunch", id: "bl_bp" },
+  { label: "Before Dinner", id: "bd_bp" },
+  { label: "2 Hours After Dinner", id: "2h_bp" }
+];
+
+const SUGAR_SLOTS = [
+  { label: "Before Breakfast", id: "bb_sugar" },
+  { label: "Before Lunch", id: "bl_sugar" },
+  { label: "Before Dinner", id: "bd_sugar" },
+  { label: "2 Hours After Dinner", id: "2h_sugar" }
+];
+
+function formatISTNow(){
+  return new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
 }
 
-function buildDayTableHTML(dayObj){
-  const date = dayObj.date;
-  const data = dayObj.data || {};
-  const c = calcCompletionForDate(data, date);
+function setExportUI(isWorking, msg){
+  const btn = document.getElementById("exportBtn");
+  const status = document.getElementById("exportStatus");
+  if(btn) btn.disabled = isWorking;
+  if(status) status.textContent = msg || "";
+}
 
-  let html = `
-    <div style="margin-bottom:18px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <h3 style="margin:0;">${date}</h3>
-        <span class="badge">${c.percent}% complete</span>
-      </div>
-      <div class="small">Done: ${c.done} / ${c.total}</div>
-      <hr/>
-  `;
+function getBPString(entry){
+  if(!entry) return "";
+  const sys = entry.sys || "";
+  const dia = entry.dia || "";
+  const pulse = entry.pulse || "";
+  if(!sys && !dia && !pulse) return "";
+  let s = "";
+  if(sys && dia) s = `${sys}/${dia}`;
+  else if(sys || dia) s = `${sys}${dia ? "/" + dia : ""}`;
+  if(pulse) s += (s ? " " : "") + `(Pulse ${pulse})`;
+  return s.trim();
+}
 
-  const comments = (data && data.__comments) ? String(data.__comments) : "";
-  if(comments.trim()){
-    html += `<div style="margin-bottom:12px;">
-      <div style="font-weight:900;margin-bottom:6px;">Comments</div>
-      <div style="white-space:pre-wrap;border:1px solid #ddd;border-radius:10px;padding:10px;">${escapeHtml(comments)}</div>
-    </div>`;
-  }
+function getSugarString(entry){
+  if(!entry) return "";
+  const v = entry.value || "";
+  return v ? String(v) : "";
+}
 
-  blocks.forEach(block=>{
-    const tasks = visibleTasksForDate(block, date);
+async function exportToPDF(){
+  try{
+    setExportUI(true, "Preparing data…");
 
-    html += `<h4 style="margin:10px 0 6px;">${block.title}</h4>`;
-    html += `<table><tr><th>Task</th><th>Status</th><th>Reading</th></tr>`;
+    // Query all docs from EXPORT_START_DATE up to selectedDate inclusive
+    const snap = await db.collection("boards")
+      .doc(BOARD_ID)
+      .collection("days")
+      .orderBy(firebase.firestore.FieldPath.documentId())
+      .startAt(EXPORT_START_DATE)
+      .endAt(selectedDate)
+      .get();
 
-    tasks.forEach(t=>{
-      const entry = data?.[t.id] || {};
-      const status = entry.done ? "Done" : "Not done";
+    // Build ordered day list
+    const days = [];
+    snap.forEach(doc => days.push({ date: doc.id, data: doc.data() || {} }));
 
-      let reading = "";
-      if(t.type === "bp"){
-        if(entry.sys && entry.dia){
-          reading = `${entry.sys}/${entry.dia}`;
-          if(entry.pulse) reading += ` (Pulse ${entry.pulse})`;
-        }
-      } else if(t.type === "sugar"){
-        if(entry.value) reading = `${entry.value}`;
+    // Ensure selected date exists in report even if no doc yet
+    if(!days.find(d => d.date === selectedDate)){
+      days.push({ date: selectedDate, data: {} });
+    }
+
+    days.sort((a,b)=> a.date.localeCompare(b.date));
+
+    setExportUI(true, `Generating PDF (${days.length} day(s))…`);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const marginX = 40;
+
+    // Cover header
+    doc.setFontSize(16);
+    doc.text("Dharini Checklist Report", marginX, 50);
+
+    doc.setFontSize(10);
+    doc.text(`Range: ${EXPORT_START_DATE} to ${selectedDate} (IST)`, marginX, 70);
+    doc.text(`Generated: ${formatISTNow()}`, marginX, 85);
+
+    let y = 110;
+
+    // For each day, print BP and Sugar tables + comments
+    for(let i=0; i<days.length; i++){
+      const day = days[i];
+      const data = day.data || {};
+
+      // Add page break if needed
+      if(y > 740){
+        doc.addPage();
+        y = 50;
       }
 
-      html += `<tr>
-        <td>${escapeHtml(t.text)}</td>
-        <td>${status}</td>
-        <td>${escapeHtml(reading)}</td>
-      </tr>`;
-    });
+      doc.setFontSize(14);
+      doc.text(day.date, marginX, y);
+      y += 10;
 
-    html += `</table>`;
-  });
+      // Comments
+      const comments = (data.__comments || "").trim();
+      doc.setFontSize(10);
+      if(comments){
+        const lines = doc.splitTextToSize(`Comments: ${comments}`, pageWidth - marginX*2);
+        doc.text(lines, marginX, y + 16);
+        y += 16 + lines.length * 12;
+      } else {
+        doc.text("Comments: —", marginX, y + 16);
+        y += 34;
+      }
 
-  html += `</div>`;
-  return html;
-}
+      // BP table
+      const bpRows = BP_SLOTS.map(s => {
+        const entry = data[s.id] || {};
+        return [
+          s.label,
+          entry.done ? "Done" : "",
+          getBPString(entry) || "—"
+        ];
+      });
 
-async function exportSelectedDayPDF(){
-  const day = await fetchDayDoc(selectedDate);
-  await exportDaysToPDF([day], `Dharini_${selectedDate}.pdf`);
-}
+      doc.autoTable({
+        startY: y,
+        head: [["BP Slot", "Done", "Reading"]],
+        body: bpRows,
+        theme: "grid",
+        styles: { fontSize: 9, cellPadding: 5 },
+        headStyles: { fillColor: [245,245,245], textColor: 20 },
+        margin: { left: marginX, right: marginX }
+      });
 
-async function exportSelectedPlusPreviousPDF(){
-  const snap = await db.collection("boards").doc(BOARD_ID).collection("days")
-    .orderBy(firebase.firestore.FieldPath.documentId())
-    .endAt(selectedDate)
-    .get();
+      y = doc.lastAutoTable.finalY + 14;
 
-  const days = [];
-  snap.forEach(doc => days.push({ date: doc.id, data: doc.data() }));
+      // Sugar table
+      const sugarRows = SUGAR_SLOTS.map(s => {
+        const entry = data[s.id] || {};
+        return [
+          s.label,
+          entry.done ? "Done" : "",
+          getSugarString(entry) || "—"
+        ];
+      });
 
-  await exportDaysToPDF(days, `Dharini_Upto_${selectedDate}.pdf`);
-}
+      doc.autoTable({
+        startY: y,
+        head: [["Sugar Slot", "Done", "Reading"]],
+        body: sugarRows,
+        theme: "grid",
+        styles: { fontSize: 9, cellPadding: 5 },
+        headStyles: { fillColor: [245,245,245], textColor: 20 },
+        margin: { left: marginX, right: marginX }
+      });
 
-async function exportLastNDaysPDF(n){
-  const snap = await db.collection("boards").doc(BOARD_ID).collection("days")
-    .orderBy(firebase.firestore.FieldPath.documentId())
-    .limitToLast(n)
-    .get();
+      y = doc.lastAutoTable.finalY + 26;
+    }
 
-  const days = [];
-  snap.forEach(doc => days.push({ date: doc.id, data: doc.data() }));
+    const filename = `Dharini_Report_${EXPORT_START_DATE}_to_${selectedDate}.pdf`;
+    doc.save(filename);
 
-  const first = days.length ? days[0].date : "start";
-  await exportDaysToPDF(days, `Dharini_${first}_to_${selectedDate}_Last${n}.pdf`);
-}
+    setExportUI(false, "Done");
+    setTimeout(()=>setExportUI(false,""), 2000);
 
-async function exportDaysToPDF(days, filename){
-  const container = document.getElementById("pdfContainer");
-  container.innerHTML = "";
-
-  const wrap = document.createElement("div");
-  wrap.className = "pdfWrap";
-
-  wrap.innerHTML = `
-    <h2 style="margin-top:0;">Dharini Checklist Report</h2>
-    <div class="small">Generated: ${new Date().toLocaleString()}</div>
-    <div class="small">Report includes: ${days.length} day(s)</div>
-    <hr/>
-  `;
-
-  for(const day of days){
-    wrap.innerHTML += buildDayTableHTML(day);
+  } catch(err){
+    setExportUI(false, "Export failed. Check internet and try again.");
   }
-
-  container.appendChild(wrap);
-
-  const opt = {
-    margin:       10,
-    filename:     filename,
-    image:        { type: 'jpeg', quality: 0.95 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: ['css', 'legacy'] }
-  };
-
-  await html2pdf().set(opt).from(wrap).save();
 }
 
 /* ================= BOOT ================= */
