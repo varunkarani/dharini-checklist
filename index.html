@@ -248,36 +248,49 @@ function render(data,docRef){
       row.appendChild(cb);
       row.append(" "+task.text);
 
-      if(task.type==="bp"){
-        const sys=document.createElement("input");
-        sys.placeholder="Sys";
-        sys.value=data?.[task.id]?.sys||"";
+   if(task.type==="bp"){
+  const sys=document.createElement("input");
+  sys.placeholder="Sys";
+  sys.value=data?.[task.id]?.sys||"";
+  sys.inputMode="numeric";
 
-        const dia=document.createElement("input");
-        dia.placeholder="Dia";
-        dia.value=data?.[task.id]?.dia||"";
+  const dia=document.createElement("input");
+  dia.placeholder="Dia";
+  dia.value=data?.[task.id]?.dia||"";
+  dia.inputMode="numeric";
 
-        const save=document.createElement("button");
-        save.textContent="Save BP";
-        save.onclick=()=>{
-          docRef.set({
-            [task.id]:{
-              done:true,
-              sys:sys.value,
-              dia:dia.value
-            }
-          },{merge:true});
-        };
+  const pulse=document.createElement("input");
+  pulse.placeholder="Pulse";
+  pulse.value=data?.[task.id]?.pulse||"";
+  pulse.inputMode="numeric";
 
-        row.appendChild(document.createElement("br"));
-        row.appendChild(sys);
-        row.appendChild(dia);
-        row.appendChild(save);
-
-        const last = (data?.[task.id]?.sys && data?.[task.id]?.dia) ? `${data[task.id].sys}/${data[task.id].dia}` : "—";
-        row.appendChild(document.createElement("br"));
-        row.appendChild(smallText("Saved: "+last));
+  const save=document.createElement("button");
+  save.textContent="Save BP";
+  save.onclick=()=>{
+    docRef.set({
+      [task.id]:{
+        done:true,
+        sys:sys.value,
+        dia:dia.value,
+        pulse:pulse.value
       }
+    },{merge:true});
+  };
+
+  row.appendChild(document.createElement("br"));
+  row.appendChild(sys);
+  row.appendChild(dia);
+  row.appendChild(pulse);
+  row.appendChild(save);
+
+  const hasBP = data?.[task.id]?.sys && data?.[task.id]?.dia;
+  const last = hasBP
+    ? `${data[task.id].sys}/${data[task.id].dia}` + (data?.[task.id]?.pulse ? ` (Pulse ${data[task.id].pulse})` : "")
+    : "—";
+
+  row.appendChild(document.createElement("br"));
+  row.appendChild(smallText("Saved: "+last));
+}
 
       if(task.type==="sugar"){
         const val=document.createElement("input");
