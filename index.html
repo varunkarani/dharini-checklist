@@ -3,29 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dharini Checklist</title>
+<title>Dharini Checklist (Synced)</title>
+
 <style>
 body{font-family:system-ui;background:#f6f7fb;margin:0;padding:16px}
+h2{margin-top:0}
 .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
-button{padding:10px 14px;border-radius:10px;border:0;background:#2f6fed;color:#fff;font-weight:700}
-input{padding:8px;border-radius:8px;border:1px solid #ddd;margin-top:6px;width:100%}
+.blockTitle{font-weight:900;margin-bottom:10px}
+.task{margin-bottom:10px}
+button{padding:8px 12px;border-radius:8px;border:0;background:#2f6fed;color:#fff;font-weight:700}
+input{padding:6px;border-radius:6px;border:1px solid #ddd;margin-top:4px}
+.progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:12px}
+.progress div{height:100%;background:#2f6fed;width:0%}
+.small{font-size:12px;opacity:.7}
 </style>
 </head>
+
 <body>
 
-<h2>Dharini Checklist (Synced)</h2>
+<h2>Dharini Daily Checklist (Synced)</h2>
+<div class="progress"><div id="bar"></div></div>
+<div id="percent"></div>
 <div id="app"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+/* ================= FIREBASE CONFIG ================= */
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAxjeAx9iMHomGppnnouaJ5ISR3AthNEvU",
   authDomain: "dharini-checklist-sync.firebaseapp.com",
@@ -35,48 +41,191 @@ const firebaseConfig = {
   appId: "1:428971704286:web:bd52c5bb86c9ed3725674f"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ================= SETTINGS ================= */
 
 const BOARD_ID = "dharini-global-board";
+const TIMEZONE = "Asia/Kolkata";
+const CEFHUM_END = "2026-02-20";
 
-const tasks = [
-  "BP Before Breakfast",
-  "Sugar Before Breakfast",
-  "Novorapid 10u",
-  "Pan D",
-  "Met XL",
-  "Nikoran"
-];
+/* ================= HELPERS ================= */
 
-const today = new Date().toISOString().split("T")[0];
+function todayIST(){
+  const now = new Date();
+  const ist = new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
+  return ist.toISOString().split("T")[0];
+}
+
+function isSunday(){
+  const now = new Date();
+  const ist = new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
+  return ist.getDay() === 0;
+}
+
+function afterEnd(date){
+  return date > CEFHUM_END;
+}
+
+const today = todayIST();
 
 const docRef = db.collection("boards")
   .doc(BOARD_ID)
   .collection("days")
   .doc(today);
 
+/* ================= CHECKLIST STRUCTURE ================= */
+
+const blocks = [
+{
+title:"Before Breakfast",
+tasks:[
+{ id:"bb_bp", text:"Measure BP", type:"bp"},
+{ id:"bb_sugar", text:"Measure Sugar", type:"sugar"},
+{ id:"bb_novo10", text:"Novorapid 10u"},
+{ id:"bb_panD", text:"Pan D"}
+]},
+{
+title:"After Breakfast",
+tasks:[
+{ id:"ab_cefhum", text:"Cefhum", show:()=>!afterEnd(today)},
+{ id:"ab_metxl", text:"Met XL"},
+{ id:"ab_nikoran", text:"Nikoran"},
+{ id:"ab_lasilactone", text:"Lasilactone"},
+{ id:"ab_cobadex", text:"Cobadex"},
+{ id:"ab_folic", text:"Folic Acid"},
+{ id:"ab_ivabred", text:"Ivabred"},
+{ id:"ab_dolo", text:"Dolo (optional)"},
+{ id:"ab_vitd", text:"Vit D (Sunday only)", show:()=>isSunday()}
+]},
+{
+title:"Before Lunch",
+tasks:[
+{ id:"bl_bp", text:"Measure BP", type:"bp"},
+{ id:"bl_sugar", text:"Measure Sugar", type:"sugar"},
+{ id:"bl_novo12", text:"Novorapid 12u"}
+]},
+{
+title:"After Lunch",
+tasks:[
+{ id:"al_ecosprin", text:"Ecosprin"},
+{ id:"al_clopitab", text:"Clopitab"}
+]},
+{
+title:"Before Dinner",
+tasks:[
+{ id:"bd_bp", text:"Measure BP", type:"bp"},
+{ id:"bd_sugar", text:"Measure Sugar", type:"sugar"},
+{ id:"bd_novo7", text:"Novorapid 7u"}
+]},
+{
+title:"After Dinner Meds",
+tasks:[
+{ id:"ad_cefhum", text:"Cefhum", show:()=>!afterEnd(today)},
+{ id:"ad_halfmet", text:"½ Met XL"},
+{ id:"ad_nikoran", text:"Nikoran"},
+{ id:"ad_ivabred", text:"Ivabred"}
+]},
+{
+title:"2 Hours After Dinner",
+tasks:[
+{ id:"2h_bp", text:"Measure BP", type:"bp"},
+{ id:"2h_sugar", text:"Measure Sugar", type:"sugar"},
+{ id:"2h_tresiba", text:"Tresiba 16u"},
+{ id:"2h_dolo", text:"Dolo (if pain)"},
+{ id:"2h_rosuva", text:"Rosuvastatin"}
+]}
+];
+
+/* ================= RENDER ================= */
+
 function render(data){
+
   const app = document.getElementById("app");
-  app.innerHTML = "";
-  tasks.forEach(t=>{
-    const card = document.createElement("div");
+  app.innerHTML="";
+  let total=0, done=0;
+
+  blocks.forEach(block=>{
+    const card=document.createElement("div");
     card.className="card";
 
-    const cb = document.createElement("input");
-    cb.type="checkbox";
-    cb.checked = data?.[t]?.done || false;
-    cb.onchange = ()=>{
-      docRef.set({
-        [t]: {done:cb.checked}
-      },{merge:true});
-    };
+    const title=document.createElement("div");
+    title.className="blockTitle";
+    title.textContent=block.title;
+    card.appendChild(title);
 
-    card.append(t);
-    card.appendChild(document.createElement("br"));
-    card.appendChild(cb);
+    block.tasks.forEach(task=>{
+      if(task.show && !task.show()) return;
+
+      total++;
+      const taskDiv=document.createElement("div");
+      taskDiv.className="task";
+
+      const cb=document.createElement("input");
+      cb.type="checkbox";
+      cb.checked=data?.[task.id]?.done||false;
+
+      if(cb.checked) done++;
+
+      cb.onchange=()=>{
+        docRef.set({
+          [task.id]:{done:cb.checked}
+        },{merge:true});
+      };
+
+      taskDiv.appendChild(cb);
+      taskDiv.append(" "+task.text);
+
+      if(task.type==="bp"){
+        const sys=document.createElement("input");
+        sys.placeholder="Sys";
+        const dia=document.createElement("input");
+        dia.placeholder="Dia";
+        const save=document.createElement("button");
+        save.textContent="Save";
+        save.onclick=()=>{
+          docRef.set({
+            [task.id]:{
+              done:true,
+              sys:sys.value,
+              dia:dia.value
+            }
+          },{merge:true});
+        };
+        taskDiv.appendChild(document.createElement("br"));
+        taskDiv.appendChild(sys);
+        taskDiv.appendChild(dia);
+        taskDiv.appendChild(save);
+      }
+
+      if(task.type==="sugar"){
+        const val=document.createElement("input");
+        val.placeholder="Sugar";
+        const save=document.createElement("button");
+        save.textContent="Save";
+        save.onclick=()=>{
+          docRef.set({
+            [task.id]:{
+              done:true,
+              value:val.value
+            }
+          },{merge:true});
+        };
+        taskDiv.appendChild(document.createElement("br"));
+        taskDiv.appendChild(val);
+        taskDiv.appendChild(save);
+      }
+
+      card.appendChild(taskDiv);
+    });
+
     app.appendChild(card);
   });
+
+  const percent=Math.round((done/total)*100)||0;
+  document.getElementById("bar").style.width=percent+"%";
+  document.getElementById("percent").textContent=percent+"% Complete Today";
 }
 
 docRef.onSnapshot(doc=>{
