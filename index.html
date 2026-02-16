@@ -3,37 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dharini Checklist (Synced)</title>
+<title>Dharini Daily Checklist</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <style>
 body{font-family:system-ui;background:#f6f7fb;margin:0;padding:16px}
 h2{margin-top:0}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+.nav{margin-bottom:16px}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
 .blockTitle{font-weight:900;margin-bottom:10px}
-.task{margin-bottom:10px}
-button{padding:8px 12px;border-radius:8px;border:0;background:#2f6fed;color:#fff;font-weight:700}
-input{padding:6px;border-radius:6px;border:1px solid #ddd;margin-top:4px}
-.progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:12px}
+.task{margin-bottom:12px}
+input{padding:6px;border-radius:6px;border:1px solid #ddd;margin:4px}
+button{padding:6px 10px;border-radius:6px;border:0;background:#2f6fed;color:#fff;font-weight:700}
+.progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:8px}
 .progress div{height:100%;background:#2f6fed;width:0%}
-.small{font-size:12px;opacity:.7}
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  
 </head>
 
 <body>
 
-<h2>Dharini Daily Checklist (Synced)</h2>
+<h2>Dharini Daily Checklist</h2>
+
+<div class="nav">
+<button onclick="shiftDay(-1)">◀ Previous</button>
+<input type="date" id="datePicker">
+<button onclick="shiftDay(1)">Next ▶</button>
+</div>
+
 <div class="progress"><div id="bar"></div></div>
 <div id="percent"></div>
+
 <div id="app"></div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<div class="card">
+<h3>Trends (Last 30 Days)</h3>
+<canvas id="bpChart"></canvas>
+<canvas id="sugarChart"></canvas>
+</div>
 
 <script>
 
-/* ================= FIREBASE CONFIG ================= */
+/* ================= FIREBASE ================= */
 
 const firebaseConfig = {
   apiKey: "AIzaSyAxjeAx9iMHomGppnnouaJ5ISR3AthNEvU",
@@ -49,41 +62,30 @@ const db = firebase.firestore();
 
 /* ================= SETTINGS ================= */
 
-const BOARD_ID = "dharini-global-board";
-const TIMEZONE = "Asia/Kolkata";
-const CEFHUM_END = "2026-02-20";
-let selectedDate = getISTDate();
+const BOARD_ID="dharini-global-board";
+const TIMEZONE="Asia/Kolkata";
+const CEFHUM_END="2026-02-20";
+let selectedDate=getISTDate();
 
 /* ================= HELPERS ================= */
 
 function getISTDate(dateObj=null){
-  const now = dateObj || new Date();
-  const ist = new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
+  const now=dateObj||new Date();
+  const ist=new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
   return ist.toISOString().split("T")[0];
 }
 
 function shiftDay(days){
-  const d = new Date(selectedDate);
+  const d=new Date(selectedDate);
   d.setDate(d.getDate()+days);
-  selectedDate = getISTDate(d);
+  selectedDate=getISTDate(d);
   loadDay();
 }
 
-function afterEnd(date){ return date > CEFHUM_END; }
-function isSunday(date){ return new Date(date).getDay()===0; }
+function afterEnd(date){return date>CEFHUM_END;}
+function isSunday(date){return new Date(date).getDay()===0;}
 
-/* ================= NAVIGATION ================= */
-
-const nav=document.createElement("div");
-nav.style.marginBottom="16px";
-nav.innerHTML=`
-<button onclick="shiftDay(-1)">◀ Previous</button>
-<input type="date" id="datePicker">
-<button onclick="shiftDay(1)">Next ▶</button>
-`;
-document.body.insertBefore(nav,document.body.firstChild);
-
-/* ================= CHECKLIST STRUCTURE ================= */
+/* ================= FULL CHECKLIST ================= */
 
 const blocks=[
 {
@@ -106,6 +108,43 @@ tasks:[
 {id:"ab_ivabred",text:"Ivabred"},
 {id:"ab_dolo",text:"Dolo (optional)"},
 {id:"ab_vitd",text:"Vit D (Sunday only)",show:(d)=>isSunday(d)}
+]},
+{
+title:"Before Lunch",
+tasks:[
+{id:"bl_bp",text:"Measure BP",type:"bp"},
+{id:"bl_sugar",text:"Measure Sugar",type:"sugar"},
+{id:"bl_novo12",text:"Novorapid 12u"}
+]},
+{
+title:"After Lunch",
+tasks:[
+{id:"al_ecosprin",text:"Ecosprin"},
+{id:"al_clopitab",text:"Clopitab"}
+]},
+{
+title:"Before Dinner",
+tasks:[
+{id:"bd_bp",text:"Measure BP",type:"bp"},
+{id:"bd_sugar",text:"Measure Sugar",type:"sugar"},
+{id:"bd_novo7",text:"Novorapid 7u"}
+]},
+{
+title:"After Dinner Meds",
+tasks:[
+{id:"ad_cefhum",text:"Cefhum",show:(d)=>!afterEnd(d)},
+{id:"ad_halfmet",text:"½ Met XL"},
+{id:"ad_nikoran",text:"Nikoran"},
+{id:"ad_ivabred",text:"Ivabred"}
+]},
+{
+title:"2 Hours After Dinner",
+tasks:[
+{id:"2h_bp",text:"Measure BP",type:"bp"},
+{id:"2h_sugar",text:"Measure Sugar",type:"sugar"},
+{id:"2h_tresiba",text:"Tresiba 16u"},
+{id:"2h_dolo",text:"Dolo (if pain)"},
+{id:"2h_rosuva",text:"Rosuvastatin"}
 ]}
 ];
 
@@ -115,13 +154,9 @@ let unsubscribe=null;
 
 function loadDay(){
 
-  if(unsubscribe) unsubscribe();
+  if(unsubscribe)unsubscribe();
 
   document.getElementById("datePicker").value=selectedDate;
-  document.getElementById("datePicker").onchange=(e)=>{
-    selectedDate=e.target.value;
-    loadDay();
-  };
 
   const docRef=db.collection("boards")
     .doc(BOARD_ID)
@@ -153,15 +188,16 @@ function render(data,docRef){
     card.appendChild(title);
 
     block.tasks.forEach(task=>{
-      if(task.show && !task.show(selectedDate)) return;
+      if(task.show && !task.show(selectedDate))return;
 
       total++;
       const row=document.createElement("div");
+      row.className="task";
 
       const cb=document.createElement("input");
       cb.type="checkbox";
       cb.checked=data?.[task.id]?.done||false;
-      if(cb.checked) done++;
+      if(cb.checked)done++;
 
       cb.onchange=()=>{
         docRef.set({
@@ -187,8 +223,8 @@ function render(data,docRef){
           docRef.set({
             [task.id]:{
               done:true,
-              sys:parseInt(sys.value),
-              dia:parseInt(dia.value)
+              sys:parseInt(sys.value)||"",
+              dia:parseInt(dia.value)||""
             }
           },{merge:true});
         };
@@ -210,7 +246,7 @@ function render(data,docRef){
           docRef.set({
             [task.id]:{
               done:true,
-              value:parseFloat(val.value)
+              value:parseFloat(val.value)||""
             }
           },{merge:true});
         };
@@ -228,17 +264,13 @@ function render(data,docRef){
 
   const percent=Math.round((done/total)*100)||0;
   document.getElementById("bar").style.width=percent+"%";
-  document.getElementById("percent").textContent=percent+"% Complete ("+selectedDate+")";
+  document.getElementById("percent").textContent=
+    percent+"% Complete ("+selectedDate+")";
 }
 
 /* ================= TRENDS ================= */
 
 async function loadTrends(){
-
-  const trendSection=document.createElement("div");
-  trendSection.className="card";
-  trendSection.innerHTML="<h3>Trends (Last 30 Days)</h3><canvas id='bpChart'></canvas><canvas id='sugarChart'></canvas>";
-  document.getElementById("app").appendChild(trendSection);
 
   const snapshot=await db.collection("boards")
     .doc(BOARD_ID)
@@ -248,16 +280,16 @@ async function loadTrends(){
     .get();
 
   const labels=[];
-  const sysData=[];
-  const diaData=[];
-  const sugarData=[];
+  const sys=[];
+  const dia=[];
+  const sugar=[];
 
   snapshot.forEach(doc=>{
     const d=doc.data();
     labels.push(doc.id);
-    sysData.push(d?.bb_bp?.sys||null);
-    diaData.push(d?.bb_bp?.dia||null);
-    sugarData.push(d?.bb_sugar?.value||null);
+    sys.push(d?.bb_bp?.sys||null);
+    dia.push(d?.bb_bp?.dia||null);
+    sugar.push(d?.bb_sugar?.value||null);
   });
 
   new Chart(document.getElementById("bpChart"),{
@@ -265,8 +297,8 @@ async function loadTrends(){
     data:{
       labels,
       datasets:[
-        {label:"Systolic",data:sysData,borderColor:"red"},
-        {label:"Diastolic",data:diaData,borderColor:"blue"}
+        {label:"Systolic",data:sys,borderColor:"red"},
+        {label:"Diastolic",data:dia,borderColor:"blue"}
       ]
     }
   });
@@ -276,11 +308,16 @@ async function loadTrends(){
     data:{
       labels,
       datasets:[
-        {label:"Sugar",data:sugarData,borderColor:"green"}
+        {label:"Sugar",data:sugar,borderColor:"green"}
       ]
     }
   });
 }
+
+document.getElementById("datePicker").onchange=e=>{
+  selectedDate=e.target.value;
+  loadDay();
+};
 
 loadDay();
 
