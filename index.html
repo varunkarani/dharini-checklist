@@ -94,11 +94,6 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 .themeDot{width:10px;height:10px;border-radius:999px;background:var(--progressFill)}
 
 /* Today-at-a-glance */
-.stickyTop{
-  position:sticky;top:0;z-index:50;
-  background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0)) , var(--bg);
-  padding-top:8px;
-}
 .topCard{
   background:var(--card);
   border:1px solid var(--borderSoft);
@@ -119,7 +114,6 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 .pill.ok{background:rgba(15,157,88,.12);border-color:rgba(15,157,88,.22);color:var(--ok)}
 .kpiRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 .kpiLeft{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.kpiRight{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .missList{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
 .missItem{
   padding:8px 10px;border-radius:10px;border:1px solid var(--borderSoft);
@@ -132,7 +126,6 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 .bigInputs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .bigInputs input{width:110px;font-size:20px;padding:12px 12px}
 .bigInputs input.narrow{width:95px}
-.bigInputs .hint{flex-basis:100%}
 
 /* Abnormal highlight */
 .readingTag{
@@ -150,41 +143,36 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 
 <body>
 
-<div class="stickyTop">
-  <h2>Dharini Daily Checklist</h2>
+<h2>Dharini Daily Checklist</h2>
 
-  <div class="nav">
-    <button onclick="shiftDay(-1)">◀ Previous</button>
-    <input type="date" id="datePicker">
-    <button onclick="shiftDay(1)">Next ▶</button>
+<div class="nav">
+  <button onclick="shiftDay(-1)">◀ Previous</button>
+  <input type="date" id="datePicker">
+  <button onclick="shiftDay(1)">Next ▶</button>
 
-    <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
-      Add Reminders to phone
-    </a>
+  <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
+    Add alarms
+  </a>
 
-    <button class="themeBtn" id="themeToggle" type="button" onclick="toggleTheme()">
-      <span class="themeDot"></span>
-      <span id="themeLabel">Theme</span>
-    </button>
-  </div>
-
-  <!-- Today at a glance -->
-  <div class="topCard" id="todayAtGlance">
-    <div class="kpiRow">
-      <div class="kpiLeft">
-        <span class="pill" id="kpiCompletion">—</span>
-        <span class="pill" id="kpiNext">Next: —</span>
-      </div>
-      <div class="kpiRight">
-        <button class="ghost" onclick="jumpToNextMissing()">Jump to next missing</button>
-      </div>
-    </div>
-    <div class="missList" id="missList"></div>
-  </div>
-
-  <div class="progress"><div id="bar"></div></div>
-  <div id="percent"></div>
+  <button class="themeBtn" id="themeToggle" type="button" onclick="toggleTheme()">
+    <span class="themeDot"></span>
+    <span id="themeLabel">Theme</span>
+  </button>
 </div>
+
+<!-- Today at a Glance (NOT sticky) -->
+<div class="card" id="todayAtGlance">
+  <div class="blockTitle">Today at a Glance</div>
+  <div class="kpiRow">
+    <div class="kpiLeft">
+      <span class="pill" id="kpiCompletion">—</span>
+    </div>
+  </div>
+  <div class="missList" id="missList"></div>
+</div>
+
+<div class="progress"><div id="bar"></div></div>
+<div id="percent"></div>
 
 <div id="app"></div>
 
@@ -297,7 +285,7 @@ let selectedDate = getISTDate();
 let activeDocRef = null;
 let unsubscribe = null;
 let commentsTimer = null;
-let latestDayDataCache = {}; // used for at-a-glance, jump to next missing
+let latestDayDataCache = {};
 
 /* ================= HELPERS ================= */
 
@@ -346,7 +334,7 @@ function renderLastEdited(data){
   });
 }
 
-/* ================= CHECKLIST + SCHEDULE ================= */
+/* ================= CHECKLIST ================= */
 
 const blocks = [
 {
@@ -439,15 +427,16 @@ function calcCompletionForDate(data, date){
   return { total, done, percent };
 }
 
-/* Schedule (for "today at a glance" + missed detection) */
-const SCHEDULE = [
-  { key:"bb", title:"Before Breakfast", hour:8, minute:0, requiredIds:["bb_bp","bb_sugar"] },
-  { key:"ab", title:"After Breakfast",  hour:8, minute:30, requiredIds:[] },
-  { key:"bl", title:"Before Lunch",     hour:13, minute:0, requiredIds:["bl_bp","bl_sugar"] },
-  { key:"al", title:"After Lunch",      hour:13, minute:30, requiredIds:[] },
-  { key:"bd", title:"Before Dinner",    hour:20, minute:0, requiredIds:["bd_bp","bd_sugar"] },
-  { key:"ad", title:"After Dinner",     hour:20, minute:30, requiredIds:[] },
-  { key:"2h", title:"2 Hours After Dinner", hour:22, minute:30, requiredIds:["2h_bp","2h_sugar"] }
+/* Missed detection: if required readings not done after a soft time cutoff */
+const REQUIRED_READINGS = [
+  { label: "Before Breakfast BP", id:"bb_bp", dueHour: 8, dueMinute: 30 },
+  { label: "Before Breakfast Sugar", id:"bb_sugar", dueHour: 8, dueMinute: 30 },
+  { label: "Before Lunch BP", id:"bl_bp", dueHour: 13, dueMinute: 30 },
+  { label: "Before Lunch Sugar", id:"bl_sugar", dueHour: 13, dueMinute: 30 },
+  { label: "Before Dinner BP", id:"bd_bp", dueHour: 20, dueMinute: 30 },
+  { label: "Before Dinner Sugar", id:"bd_sugar", dueHour: 20, dueMinute: 30 },
+  { label: "2 Hours After Dinner BP", id:"2h_bp", dueHour: 23, dueMinute: 0 },
+  { label: "2 Hours After Dinner Sugar", id:"2h_sugar", dueHour: 23, dueMinute: 0 }
 ];
 
 function nowInIST(){
@@ -456,73 +445,21 @@ function nowInIST(){
 function minutesSinceMidnight(d){
   return d.getHours()*60 + d.getMinutes();
 }
-function scheduledMinutes(item){ return item.hour*60 + item.minute; }
-
-function nextCheckpointLabel(){
-  const now = nowInIST();
-  const m = minutesSinceMidnight(now);
-  for(const s of SCHEDULE){
-    if(scheduledMinutes(s) > m){
-      return `Next: ${s.title} (${pad2(s.hour)}:${pad2(s.minute)})`;
-    }
-  }
-  return "Next: Tomorrow (Before Breakfast)";
-}
-function pad2(n){ return String(n).padStart(2,"0"); }
-
-/* Missed detection: if it's past checkpoint time + grace, and required readings not done */
-const GRACE_MINUTES = 30;
+function dueMinutes(item){ return item.dueHour*60 + item.dueMinute; }
 
 function computeMissedBadges(data){
   const badges = [];
   const now = nowInIST();
   const nowM = minutesSinceMidnight(now);
 
-  for(const s of SCHEDULE){
-    if(!s.requiredIds || s.requiredIds.length === 0) continue;
-
-    const dueM = scheduledMinutes(s) + GRACE_MINUTES;
-    if(nowM < dueM) continue;
-
-    for(const id of s.requiredIds){
-      const entry = data?.[id] || {};
-      if(!entry.done){
-        badges.push({
-          text: `${s.title}: ${id.includes("bp") ? "BP" : "Sugar"} missing`,
-          severity: "danger",
-          taskId: id
-        });
-      }
+  for(const r of REQUIRED_READINGS){
+    if(nowM < dueMinutes(r)) continue;
+    const entry = data?.[r.id] || {};
+    if(!entry.done){
+      badges.push({ text: r.label + " missing", severity:"danger", taskId:r.id });
     }
   }
-
   return badges;
-}
-
-function jumpToNextMissing(){
-  const missing = findNextMissingTask(latestDayDataCache);
-  if(!missing){
-    alert("Nothing missing right now.");
-    return;
-  }
-  const el = document.getElementById("task_"+missing);
-  if(el){
-    el.scrollIntoView({ behavior:"smooth", block:"center" });
-    el.style.outline = "3px solid rgba(76,141,255,.65)";
-    setTimeout(()=>{ el.style.outline=""; }, 1800);
-  }
-}
-
-function findNextMissingTask(data){
-  for(const block of blocks){
-    const tasks = visibleTasksForDate(block, selectedDate);
-    for(const t of tasks){
-      if(!data?.[t.id]?.done){
-        return t.id;
-      }
-    }
-  }
-  return null;
 }
 
 /* Target ranges + flags (defaults; easy to tweak) */
@@ -581,12 +518,6 @@ function renderAtAGlance(dayData){
   if(kpiCompletion){
     kpiCompletion.textContent = `${c.percent}% complete (${c.done}/${c.total})`;
     kpiCompletion.className = "pill " + (c.percent >= 85 ? "ok" : (c.percent >= 50 ? "warn" : "danger"));
-  }
-
-  const kpiNext = document.getElementById("kpiNext");
-  if(kpiNext){
-    kpiNext.textContent = nextCheckpointLabel();
-    kpiNext.className = "pill";
   }
 
   const missList = document.getElementById("missList");
@@ -716,11 +647,6 @@ function render(data){
         wrap.appendChild(pulse);
         wrap.appendChild(save);
 
-        const hint = document.createElement("div");
-        hint.className = "small hint";
-        hint.textContent = "Tip: tap a box and you’ll get the numeric keypad.";
-        wrap.appendChild(hint);
-
         row.appendChild(document.createElement("br"));
         row.appendChild(wrap);
       }
@@ -731,6 +657,9 @@ function render(data){
         val.value = data?.[task.id]?.value || "";
         val.inputMode = "numeric";
         val.type = "number";
+        val.style.width = "140px";
+        val.style.fontSize = "20px";
+        val.style.padding = "12px 12px";
 
         const save = document.createElement("button");
         save.textContent = "Save";
@@ -746,16 +675,8 @@ function render(data){
 
         const wrap = document.createElement("div");
         wrap.className = "bigInputs";
-        val.style.width = "140px";
-        val.style.fontSize = "20px";
-        val.style.padding = "12px 12px";
         wrap.appendChild(val);
         wrap.appendChild(save);
-
-        const hint = document.createElement("div");
-        hint.className = "small hint";
-        hint.textContent = "Tip: tap the box and you’ll get the numeric keypad.";
-        wrap.appendChild(hint);
 
         row.appendChild(document.createElement("br"));
         row.appendChild(wrap);
@@ -1060,7 +981,7 @@ applyTheme(getSavedTheme());
 wireCommentsAutosave();
 loadDay();
 
-/* Refresh missed badges every minute (only for current day view) */
+/* Refresh missed badges every minute */
 setInterval(()=>{
   if(latestDayDataCache) renderAtAGlance(latestDayDataCache);
 }, 60*1000);
