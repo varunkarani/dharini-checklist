@@ -73,11 +73,20 @@ button,.btn{
 }
 button.ghost,.btn.ghost{background:var(--ghostBg);color:var(--ghostText)}
 button:disabled{opacity:.55}
-.progress{height:8px;background:var(--progressBg);border-radius:999px;overflow:hidden;margin-bottom:8px}
+.progress{
+  height:8px;
+  background:var(--progressBg);
+  border-radius:999px;
+  overflow:hidden;
+  margin:12px 0 6px 0;  /* top right bottom left */
+}
 .progress div{height:100%;background:var(--progressFill);width:0%}
 .small{font-size:12px;color:var(--muted)}
 .rowActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-
+#percent{
+  margin-bottom:14px;
+  font-weight:600;
+}
 .themeBtn{
   display:inline-flex;align-items:center;gap:8px;
   padding:10px 14px;border-radius:10px;border:1px solid var(--borderSoft);
