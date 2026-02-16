@@ -155,7 +155,7 @@ button:disabled{opacity:.55}
 <div class="card">
   <h3 style="margin:0 0 8px 0;">Export</h3>
   <div class="small">
-    Exports all entries from <b>Feb 14, 2026</b> onwards up to the selected date (inclusive), including all BP/Sugar readings and Comments.
+    Exports all entries from <b>Feb 14</b> up to the selected date.
   </div>
   <div class="rowActions" style="margin-top:10px">
     <button id="exportBtn" onclick="exportToPDF()">Export to PDF</button>
@@ -567,7 +567,7 @@ function render(data){
 
   const percent = total ? Math.round((done/total)*100) : 0;
   document.getElementById("bar").style.width = percent + "%";
-  document.getElementById("percent").textContent = percent + "% Complete (" + selectedDate + ")";
+  document.getElementById("percent").textContent = "";
 }
 
 /* ================= COMMENTS ================= */
