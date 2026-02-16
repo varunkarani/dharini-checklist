@@ -34,6 +34,9 @@
   --progressBg:#e8eaf2;
   --progressFill:#2f6fed;
   --inputBg:#ffffff;
+  --danger:#d62c2c;
+  --warn:#b45309;
+  --ok:#0f9d58;
 }
 
 html[data-theme="dark"]{
@@ -53,6 +56,9 @@ html[data-theme="dark"]{
   --progressBg:rgba(230,237,247,.10);
   --progressFill:#4c8dff;
   --inputBg:rgba(230,237,247,.06);
+  --danger:#ff6b6b;
+  --warn:#ffb020;
+  --ok:#44d07f;
 }
 
 /* ========= BASE ========= */
@@ -62,9 +68,9 @@ h2{margin:0 0 12px 0}
 .card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);border:1px solid var(--borderSoft)}
 .blockTitle{font-weight:900;margin-bottom:10px}
 .task{margin-bottom:12px}
-input,textarea{
-  padding:8px;border-radius:8px;border:1px solid var(--border);
-  margin:4px;background:var(--inputBg);color:var(--text)
+input,textarea,select{
+  padding:10px;border-radius:10px;border:1px solid var(--border);
+  margin:4px;background:var(--inputBg);color:var(--text);font-size:16px
 }
 input::placeholder, textarea::placeholder{color:var(--muted)}
 button,.btn{
@@ -85,38 +91,100 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
   padding:10px 14px;border-radius:10px;border:1px solid var(--borderSoft);
   background:var(--ghostBg);color:var(--ghostText);font-weight:800;
 }
-.themeDot{
-  width:10px;height:10px;border-radius:999px;background:var(--progressFill);
-}
+.themeDot{width:10px;height:10px;border-radius:999px;background:var(--progressFill)}
 
-/* Improve chart canvas in dark mode */
-canvas{background:transparent}
+/* Today-at-a-glance */
+.stickyTop{
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0)) , var(--bg);
+  padding-top:8px;
+}
+.topCard{
+  background:var(--card);
+  border:1px solid var(--borderSoft);
+  border-radius:12px;
+  padding:12px;
+  box-shadow:var(--shadow);
+  margin-bottom:12px;
+}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 10px;border-radius:999px;
+  border:1px solid var(--borderSoft);
+  background:var(--ghostBg);
+  font-weight:800;font-size:12px;
+}
+.pill.danger{background:rgba(214,44,44,.12);border-color:rgba(214,44,44,.22);color:var(--danger)}
+.pill.warn{background:rgba(180,83,9,.12);border-color:rgba(180,83,9,.22);color:var(--warn)}
+.pill.ok{background:rgba(15,157,88,.12);border-color:rgba(15,157,88,.22);color:var(--ok)}
+.kpiRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.kpiLeft{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.kpiRight{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.missList{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.missItem{
+  padding:8px 10px;border-radius:10px;border:1px solid var(--borderSoft);
+  background:var(--card);
+  font-weight:800;font-size:12px;
+}
+.missItem.danger{border-color:rgba(214,44,44,.32);color:var(--danger)}
+.missItem.warn{border-color:rgba(180,83,9,.32);color:var(--warn)}
+/* Big keypad inputs */
+.bigInputs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.bigInputs input{width:110px;font-size:20px;padding:12px 12px}
+.bigInputs input.narrow{width:95px}
+.bigInputs .hint{flex-basis:100%}
+
+/* Abnormal highlight */
+.readingTag{
+  display:inline-block;
+  padding:4px 8px;border-radius:999px;
+  border:1px solid var(--borderSoft);
+  font-size:12px;font-weight:900;
+  margin-left:8px;
+}
+.readingTag.danger{border-color:rgba(214,44,44,.35);color:var(--danger)}
+.readingTag.warn{border-color:rgba(180,83,9,.35);color:var(--warn)}
+.readingTag.ok{border-color:rgba(15,157,88,.35);color:var(--ok)}
 </style>
 </head>
 
 <body>
 
-<h2>Dharini Daily Checklist</h2>
+<div class="stickyTop">
+  <h2>Dharini Daily Checklist</h2>
 
-<div class="nav">
-  <button onclick="shiftDay(-1)">◀ Previous</button>
-  <input type="date" id="datePicker">
-  <button onclick="shiftDay(1)">Next ▶</button>
+  <div class="nav">
+    <button onclick="shiftDay(-1)">◀ Previous</button>
+    <input type="date" id="datePicker">
+    <button onclick="shiftDay(1)">Next ▶</button>
 
-  <!-- Shortcut install link -->
-  <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
-    Add alarm reminders
-  </a>
+    <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
+      Add Reminders to phone
+    </a>
 
-  <!-- Dark mode toggle -->
-  <button class="themeBtn" id="themeToggle" type="button" onclick="toggleTheme()">
-    <span class="themeDot"></span>
-    <span id="themeLabel">Dark mode</span>
-  </button>
+    <button class="themeBtn" id="themeToggle" type="button" onclick="toggleTheme()">
+      <span class="themeDot"></span>
+      <span id="themeLabel">Theme</span>
+    </button>
+  </div>
+
+  <!-- Today at a glance -->
+  <div class="topCard" id="todayAtGlance">
+    <div class="kpiRow">
+      <div class="kpiLeft">
+        <span class="pill" id="kpiCompletion">—</span>
+        <span class="pill" id="kpiNext">Next: —</span>
+      </div>
+      <div class="kpiRight">
+        <button class="ghost" onclick="jumpToNextMissing()">Jump to next missing</button>
+      </div>
+    </div>
+    <div class="missList" id="missList"></div>
+  </div>
+
+  <div class="progress"><div id="bar"></div></div>
+  <div id="percent"></div>
 </div>
-
-<div class="progress"><div id="bar"></div></div>
-<div id="percent"></div>
 
 <div id="app"></div>
 
@@ -128,11 +196,20 @@ canvas{background:transparent}
 </div>
 
 <div class="card">
-  <h3 style="margin:0 0 8px 0;">Trends (Last 30 Days)</h3>
+  <h3 style="margin:0 0 8px 0;">Trends</h3>
+  <div class="rowActions" style="margin-bottom:10px">
+    <span class="small" style="font-weight:900">Chart slot:</span>
+    <select id="slotSelect" onchange="loadTrends()">
+      <option value="bb">Before Breakfast</option>
+      <option value="bl">Before Lunch</option>
+      <option value="bd">Before Dinner</option>
+      <option value="2h">2 Hours After Dinner</option>
+    </select>
+    <span class="small">Shows the selected slot across the last 30 days.</span>
+  </div>
   <canvas id="bpChart"></canvas>
   <div style="height:10px"></div>
   <canvas id="sugarChart"></canvas>
-  <div class="small" style="margin-top:8px;">Charts use the Before Breakfast readings as the baseline.</div>
 </div>
 
 <div class="card">
@@ -156,45 +233,32 @@ canvas{background:transparent}
 <script>
 /* ================= THEME (DARK MODE) ================= */
 
-function getSavedTheme(){
-  return localStorage.getItem("theme") || "system";
-}
+function getSavedTheme(){ return localStorage.getItem("theme") || "system"; }
 
 function getSystemTheme(){
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function applyTheme(theme){
-  // theme can be: "light" | "dark" | "system"
   const effective = theme === "system" ? getSystemTheme() : theme;
   document.documentElement.setAttribute("data-theme", effective);
 
-  // label
   const label = document.getElementById("themeLabel");
   if(label){
-    if(theme === "system"){
-      label.textContent = "Theme: System";
-    } else if(theme === "dark"){
-      label.textContent = "Theme: Dark";
-    } else {
-      label.textContent = "Theme: Light";
-    }
+    if(theme === "system") label.textContent = "Theme: System";
+    if(theme === "dark") label.textContent = "Theme: Dark";
+    if(theme === "light") label.textContent = "Theme: Light";
   }
-
-  // refresh charts so labels/ticks remain readable
-  refreshChartColors(effective);
 }
 
 function toggleTheme(){
-  // Cycle: system -> dark -> light -> system
   const current = getSavedTheme();
   const next = current === "system" ? "dark" : (current === "dark" ? "light" : "system");
   localStorage.setItem("theme", next);
   applyTheme(next);
-  loadTrends(); // re-render charts with new styles
+  loadTrends();
 }
 
-// React to system theme changes if user chose "system"
 if(window.matchMedia){
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
     if(getSavedTheme() === "system"){
@@ -204,22 +268,9 @@ if(window.matchMedia){
   });
 }
 
-/* Chart styling helpers */
-function isDarkNow(){
-  return document.documentElement.getAttribute("data-theme") === "dark";
-}
-
-function chartTextColor(){
-  return isDarkNow() ? "rgba(230,237,247,.85)" : "rgba(15,23,42,.85)";
-}
-
-function chartGridColor(){
-  return isDarkNow() ? "rgba(230,237,247,.12)" : "rgba(15,23,42,.12)";
-}
-
-function refreshChartColors(){
-  // no-op; kept for clarity
-}
+function isDarkNow(){ return document.documentElement.getAttribute("data-theme") === "dark"; }
+function chartTextColor(){ return isDarkNow() ? "rgba(230,237,247,.85)" : "rgba(15,23,42,.85)"; }
+function chartGridColor(){ return isDarkNow() ? "rgba(230,237,247,.12)" : "rgba(15,23,42,.12)"; }
 
 /* ================= FIREBASE ================= */
 
@@ -246,6 +297,7 @@ let selectedDate = getISTDate();
 let activeDocRef = null;
 let unsubscribe = null;
 let commentsTimer = null;
+let latestDayDataCache = {}; // used for at-a-glance, jump to next missing
 
 /* ================= HELPERS ================= */
 
@@ -294,11 +346,12 @@ function renderLastEdited(data){
   });
 }
 
-/* ================= CHECKLIST ================= */
+/* ================= CHECKLIST + SCHEDULE ================= */
 
 const blocks = [
 {
   title:"Before Breakfast",
+  key:"bb",
   tasks:[
     { id:"bb_bp", text:"Measure BP", type:"bp"},
     { id:"bb_sugar", text:"Measure Sugar", type:"sugar"},
@@ -308,6 +361,7 @@ const blocks = [
 },
 {
   title:"After Breakfast",
+  key:"ab",
   tasks:[
     { id:"ab_cefhum", text:"Cefhum", show:(d)=>!afterEnd(d)},
     { id:"ab_metxl", text:"Met XL"},
@@ -322,6 +376,7 @@ const blocks = [
 },
 {
   title:"Before Lunch",
+  key:"bl",
   tasks:[
     { id:"bl_bp", text:"Measure BP", type:"bp"},
     { id:"bl_sugar", text:"Measure Sugar", type:"sugar"},
@@ -330,6 +385,7 @@ const blocks = [
 },
 {
   title:"After Lunch",
+  key:"al",
   tasks:[
     { id:"al_ecosprin", text:"Ecosprin"},
     { id:"al_clopitab", text:"Clopitab"}
@@ -337,6 +393,7 @@ const blocks = [
 },
 {
   title:"Before Dinner",
+  key:"bd",
   tasks:[
     { id:"bd_bp", text:"Measure BP", type:"bp"},
     { id:"bd_sugar", text:"Measure Sugar", type:"sugar"},
@@ -345,6 +402,7 @@ const blocks = [
 },
 {
   title:"After Dinner",
+  key:"ad",
   tasks:[
     { id:"ad_cefhum", text:"Cefhum", show:(d)=>!afterEnd(d)},
     { id:"ad_halfmet", text:"½ Met XL"},
@@ -354,6 +412,7 @@ const blocks = [
 },
 {
   title:"2 Hours After Dinner",
+  key:"2h",
   tasks:[
     { id:"2h_bp", text:"Measure BP", type:"bp"},
     { id:"2h_sugar", text:"Measure Sugar", type:"sugar"},
@@ -366,6 +425,127 @@ const blocks = [
 
 function visibleTasksForDate(block, date){
   return block.tasks.filter(t => !t.show || t.show(date));
+}
+
+function calcCompletionForDate(data, date){
+  let total = 0, done = 0;
+  blocks.forEach(b=>{
+    visibleTasksForDate(b, date).forEach(t=>{
+      total++;
+      if(data?.[t.id]?.done) done++;
+    });
+  });
+  const percent = total ? Math.round((done/total)*100) : 0;
+  return { total, done, percent };
+}
+
+/* Schedule (for "today at a glance" + missed detection) */
+const SCHEDULE = [
+  { key:"bb", title:"Before Breakfast", hour:8, minute:0, requiredIds:["bb_bp","bb_sugar"] },
+  { key:"ab", title:"After Breakfast",  hour:8, minute:30, requiredIds:[] },
+  { key:"bl", title:"Before Lunch",     hour:13, minute:0, requiredIds:["bl_bp","bl_sugar"] },
+  { key:"al", title:"After Lunch",      hour:13, minute:30, requiredIds:[] },
+  { key:"bd", title:"Before Dinner",    hour:20, minute:0, requiredIds:["bd_bp","bd_sugar"] },
+  { key:"ad", title:"After Dinner",     hour:20, minute:30, requiredIds:[] },
+  { key:"2h", title:"2 Hours After Dinner", hour:22, minute:30, requiredIds:["2h_bp","2h_sugar"] }
+];
+
+function nowInIST(){
+  return new Date(new Date().toLocaleString("en-US",{timeZone:TIMEZONE}));
+}
+function minutesSinceMidnight(d){
+  return d.getHours()*60 + d.getMinutes();
+}
+function scheduledMinutes(item){ return item.hour*60 + item.minute; }
+
+function nextCheckpointLabel(){
+  const now = nowInIST();
+  const m = minutesSinceMidnight(now);
+  for(const s of SCHEDULE){
+    if(scheduledMinutes(s) > m){
+      return `Next: ${s.title} (${pad2(s.hour)}:${pad2(s.minute)})`;
+    }
+  }
+  return "Next: Tomorrow (Before Breakfast)";
+}
+function pad2(n){ return String(n).padStart(2,"0"); }
+
+/* Missed detection: if it's past checkpoint time + grace, and required readings not done */
+const GRACE_MINUTES = 30;
+
+function computeMissedBadges(data){
+  const badges = [];
+  const now = nowInIST();
+  const nowM = minutesSinceMidnight(now);
+
+  for(const s of SCHEDULE){
+    if(!s.requiredIds || s.requiredIds.length === 0) continue;
+
+    const dueM = scheduledMinutes(s) + GRACE_MINUTES;
+    if(nowM < dueM) continue;
+
+    for(const id of s.requiredIds){
+      const entry = data?.[id] || {};
+      if(!entry.done){
+        badges.push({
+          text: `${s.title}: ${id.includes("bp") ? "BP" : "Sugar"} missing`,
+          severity: "danger",
+          taskId: id
+        });
+      }
+    }
+  }
+
+  return badges;
+}
+
+function jumpToNextMissing(){
+  const missing = findNextMissingTask(latestDayDataCache);
+  if(!missing){
+    alert("Nothing missing right now.");
+    return;
+  }
+  const el = document.getElementById("task_"+missing);
+  if(el){
+    el.scrollIntoView({ behavior:"smooth", block:"center" });
+    el.style.outline = "3px solid rgba(76,141,255,.65)";
+    setTimeout(()=>{ el.style.outline=""; }, 1800);
+  }
+}
+
+function findNextMissingTask(data){
+  for(const block of blocks){
+    const tasks = visibleTasksForDate(block, selectedDate);
+    for(const t of tasks){
+      if(!data?.[t.id]?.done){
+        return t.id;
+      }
+    }
+  }
+  return null;
+}
+
+/* Target ranges + flags (defaults; easy to tweak) */
+const TARGETS = {
+  bp_sys_high: 140,
+  bp_dia_high: 90,
+  sugar_low: 70,
+  sugar_high: 180
+};
+
+function bpStatus(entry){
+  const sys = safeNum(entry?.sys);
+  const dia = safeNum(entry?.dia);
+  if(sys === null && dia === null) return "none";
+  if((sys !== null && sys >= TARGETS.bp_sys_high) || (dia !== null && dia >= TARGETS.bp_dia_high)) return "danger";
+  return "ok";
+}
+function sugarStatus(entry){
+  const v = safeNum(entry?.value);
+  if(v === null) return "none";
+  if(v < TARGETS.sugar_low) return "warn";
+  if(v > TARGETS.sugar_high) return "danger";
+  return "ok";
 }
 
 /* ================= LOAD DAY ================= */
@@ -382,12 +562,56 @@ function loadDay(){
 
   unsubscribe = activeDocRef.onSnapshot(doc=>{
     const d = doc.data() || {};
+    latestDayDataCache = d;
     render(d);
     loadCommentsIntoBox(d);
     renderLastEdited(d);
+    renderAtAGlance(d);
   });
 
   loadTrends();
+}
+
+/* ================= TODAY AT A GLANCE ================= */
+
+function renderAtAGlance(dayData){
+  const c = calcCompletionForDate(dayData, selectedDate);
+
+  const kpiCompletion = document.getElementById("kpiCompletion");
+  if(kpiCompletion){
+    kpiCompletion.textContent = `${c.percent}% complete (${c.done}/${c.total})`;
+    kpiCompletion.className = "pill " + (c.percent >= 85 ? "ok" : (c.percent >= 50 ? "warn" : "danger"));
+  }
+
+  const kpiNext = document.getElementById("kpiNext");
+  if(kpiNext){
+    kpiNext.textContent = nextCheckpointLabel();
+    kpiNext.className = "pill";
+  }
+
+  const missList = document.getElementById("missList");
+  if(missList){
+    missList.innerHTML = "";
+    const missed = computeMissedBadges(dayData);
+
+    if(missed.length === 0){
+      const s = document.createElement("span");
+      s.className = "pill ok";
+      s.textContent = "No missed BP/Sugar checkpoints (so far)";
+      missList.appendChild(s);
+    } else {
+      missed.forEach(m=>{
+        const d = document.createElement("div");
+        d.className = "missItem " + (m.severity === "danger" ? "danger" : "warn");
+        d.textContent = m.text;
+        d.onclick = ()=> {
+          const el = document.getElementById("task_"+m.taskId);
+          if(el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+        };
+        missList.appendChild(d);
+      });
+    }
+  }
 }
 
 /* ================= RENDER UI ================= */
@@ -412,6 +636,7 @@ function render(data){
 
       const row = document.createElement("div");
       row.className = "task";
+      row.id = "task_" + task.id;
 
       const cb = document.createElement("input");
       cb.type = "checkbox";
@@ -428,24 +653,50 @@ function render(data){
       row.appendChild(cb);
       row.append(" " + task.text);
 
+      // Flag badge next to reading tasks
+      if(task.type === "bp"){
+        const st = bpStatus(data?.[task.id]);
+        if(st !== "none"){
+          const tag = document.createElement("span");
+          tag.className = "readingTag " + st;
+          tag.textContent = st === "danger" ? "High" : "OK";
+          row.appendChild(tag);
+        }
+      }
+      if(task.type === "sugar"){
+        const st = sugarStatus(data?.[task.id]);
+        if(st !== "none"){
+          const tag = document.createElement("span");
+          tag.className = "readingTag " + st;
+          tag.textContent = st === "danger" ? "High" : (st === "warn" ? "Low" : "OK");
+          row.appendChild(tag);
+        }
+      }
+
       if(task.type === "bp"){
         const sys = document.createElement("input");
         sys.placeholder = "Sys";
         sys.value = data?.[task.id]?.sys || "";
         sys.inputMode = "numeric";
+        sys.type = "number";
+        sys.className = "narrow";
 
         const dia = document.createElement("input");
         dia.placeholder = "Dia";
         dia.value = data?.[task.id]?.dia || "";
         dia.inputMode = "numeric";
+        dia.type = "number";
+        dia.className = "narrow";
 
         const pulse = document.createElement("input");
         pulse.placeholder = "Pulse";
         pulse.value = data?.[task.id]?.pulse || "";
         pulse.inputMode = "numeric";
+        pulse.type = "number";
+        pulse.className = "narrow";
 
         const save = document.createElement("button");
-        save.textContent = "Save BP";
+        save.textContent = "Save";
         save.onclick = ()=>{
           activeDocRef.set({
             [task.id]: {
@@ -458,21 +709,31 @@ function render(data){
           updateLastEdited();
         };
 
+        const wrap = document.createElement("div");
+        wrap.className = "bigInputs";
+        wrap.appendChild(sys);
+        wrap.appendChild(dia);
+        wrap.appendChild(pulse);
+        wrap.appendChild(save);
+
+        const hint = document.createElement("div");
+        hint.className = "small hint";
+        hint.textContent = "Tip: tap a box and you’ll get the numeric keypad.";
+        wrap.appendChild(hint);
+
         row.appendChild(document.createElement("br"));
-        row.appendChild(sys);
-        row.appendChild(dia);
-        row.appendChild(pulse);
-        row.appendChild(save);
+        row.appendChild(wrap);
       }
 
       if(task.type === "sugar"){
         const val = document.createElement("input");
         val.placeholder = "Sugar";
         val.value = data?.[task.id]?.value || "";
-        val.inputMode = "decimal";
+        val.inputMode = "numeric";
+        val.type = "number";
 
         const save = document.createElement("button");
-        save.textContent = "Save Sugar";
+        save.textContent = "Save";
         save.onclick = ()=>{
           activeDocRef.set({
             [task.id]: {
@@ -483,9 +744,21 @@ function render(data){
           updateLastEdited();
         };
 
+        const wrap = document.createElement("div");
+        wrap.className = "bigInputs";
+        val.style.width = "140px";
+        val.style.fontSize = "20px";
+        val.style.padding = "12px 12px";
+        wrap.appendChild(val);
+        wrap.appendChild(save);
+
+        const hint = document.createElement("div");
+        hint.className = "small hint";
+        hint.textContent = "Tip: tap the box and you’ll get the numeric keypad.";
+        wrap.appendChild(hint);
+
         row.appendChild(document.createElement("br"));
-        row.appendChild(val);
-        row.appendChild(save);
+        row.appendChild(wrap);
       }
 
       card.appendChild(row);
@@ -539,12 +812,22 @@ function wireCommentsAutosave(){
   });
 }
 
-/* ================= TRENDS ================= */
+/* ================= TRENDS (ALL SLOTS) ================= */
 
 let bpChart = null;
 let sugarChart = null;
 
+function slotToIds(slot){
+  if(slot === "bb") return { bp:"bb_bp", sugar:"bb_sugar" };
+  if(slot === "bl") return { bp:"bl_bp", sugar:"bl_sugar" };
+  if(slot === "bd") return { bp:"bd_bp", sugar:"bd_sugar" };
+  return { bp:"2h_bp", sugar:"2h_sugar" };
+}
+
 async function loadTrends(){
+  const slot = document.getElementById("slotSelect") ? document.getElementById("slotSelect").value : "bb";
+  const ids = slotToIds(slot);
+
   const snapshot = await db.collection("boards")
     .doc(BOARD_ID)
     .collection("days")
@@ -561,10 +844,11 @@ async function loadTrends(){
   snapshot.forEach(doc=>{
     const d = doc.data();
     labels.push(doc.id);
-    sysData.push(safeNum(d?.bb_bp?.sys));
-    diaData.push(safeNum(d?.bb_bp?.dia));
-    pulseData.push(safeNum(d?.bb_bp?.pulse));
-    sugarData.push(safeNum(d?.bb_sugar?.value));
+
+    sysData.push(safeNum(d?.[ids.bp]?.sys));
+    diaData.push(safeNum(d?.[ids.bp]?.dia));
+    pulseData.push(safeNum(d?.[ids.bp]?.pulse));
+    sugarData.push(safeNum(d?.[ids.sugar]?.value));
   });
 
   if(bpChart) bpChart.destroy();
@@ -772,14 +1056,14 @@ document.getElementById("datePicker").onchange = e=>{
   loadDay();
 };
 
-// Apply saved theme on load
 applyTheme(getSavedTheme());
-
-// Ensure button label is correct immediately
-applyTheme(getSavedTheme());
-
 wireCommentsAutosave();
 loadDay();
+
+/* Refresh missed badges every minute (only for current day view) */
+setInterval(()=>{
+  if(latestDayDataCache) renderAtAGlance(latestDayDataCache);
+}, 60*1000);
 </script>
 
 </body>
