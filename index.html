@@ -17,6 +17,15 @@
 
 <style>
 :root{
+
+  /* Prevent 100% width inputs from overflowing cards (iOS especially) */
+* { box-sizing: border-box; }
+
+  #dayComments{
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+}
   --bg:#f6f7fb;
   --card:#ffffff;
   --text:#0f172a;
@@ -140,7 +149,7 @@ button:disabled{opacity:.55}
 <div class="card">
   <h3 style="margin:0 0 8px 0;">Comments (for selected day)</h3>
   <div class="small">Symptoms, missed dose reason, appetite, sleep, doctor notes.</div>
-  <textarea id="dayComments" rows="5" style="width:100%;margin-top:10px"></textarea>
+  <textarea id="dayComments" rows="5"></textarea>
   <div class="small" id="commentsStatus"></div>
 </div>
 
