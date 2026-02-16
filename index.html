@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dharini’s Daily Checklist</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; background:#f6f7fb; color:#111; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+    .header {
+      background: white; border-radius: 16px; padding: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.06);
+      position: sticky; top: 0; z-index: 5; margin-bottom: 12px;
+    }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    .sub { display:flex; gap: 10px; align-items:center; justify-content: space-between; flex-wrap: wrap; }
+    .date { font-size: 13px; opacity:.75; }
+    .call {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 12px; border-radius: 12px; background:#111; color:#fff; text-decoration:none;
+      font-weight: 800; font-size: 13px;
+    }
+    .progress { margin-top: 10px; }
+    .bar { height: 10px; background:#e8eaf2; border-radius: 999px; overflow:hidden; }
+    .bar > div { height: 100%; width: 0%; background:#2f6fed; border-radius: 999px; transition: width .2s ease; }
+    .count { margin-top: 6px; font-size: 13px; opacity:.8; display:flex; justify-content:space-between; gap:10px; flex-wrap: wrap; }
+    .pill {
+      font-size: 12px; padding: 6px 10px; border-radius: 999px; background:#fff3cd; color:#6b4e00;
+      border: 1px solid #ffe69c;
+    }
+
+    details {
+      background: white; border-radius: 16px; margin: 10px 0;
+      box-shadow: 0 6px 24px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    summary {
+      list-style: none; cursor: pointer; padding: 14px 16px; font-weight: 900;
+      display:flex; align-items:center; justify-content: space-between;
+    }
+    summary::-webkit-details-marker { display:none; }
+    .blockMeta { font-size: 12px; opacity:.7; font-weight: 800; }
+    .content { padding: 0 16px 14px; }
+    .task {
+      display:flex; gap: 10px; align-items:flex-start;
+      padding: 10px 0; border-top: 1px solid #eef0f6;
+    }
+    .task:first-child { border-top: none; }
+    input[type="checkbox"] { width: 22px; height: 22px; margin-top: 2px; }
+    .label { flex: 1; }
+    .label strong { display:block; }
+    .note {
+      width: 100%; margin-top: 6px; padding: 10px 12px; border-radius: 12px;
+      border: 1px solid #e6e8f2; background:#fafbff; font-size: 14px;
+    }
+    .row { display:flex; gap:10px; flex-wrap: wrap; margin-top: 10px; }
+    button {
+      border: 0; border-radius: 12px; padding: 12px 14px; cursor:pointer; font-weight: 900;
+      background:#2f6fed; color:#fff;
+    }
+    button.secondary { background:#111; }
+    button.ghost { background:#eef0f6; color:#111; }
+    .footer { margin: 18px 0 30px; font-size: 12px; opacity:.7; }
+    small { opacity:.75; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Dharini’s Daily Checklist</h1>
+      <div class="sub">
+        <div class="date" id="today"></div>
+        <a class="call" href="tel:+919967869439">Call Get Well Chemist</a>
+      </div>
+
+      <div class="progress">
+        <div class="bar"><div id="barFill"></div></div>
+        <div class="count">
+          <span id="doneCount">0 / 0 done</span>
+          <span class="pill" id="specialNote" style="display:none;"></span>
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="ghost" id="resetDay">Reset today</button>
+        <button class="secondary" id="expandAll">Expand all</button>
+        <button class="secondary" id="collapseAll">Collapse all</button>
+      </div>
+    </div>
+
+    <div id="blocks"></div>
+
+    <div class="footer">
+      Numbers are optional. This version saves on this device only (no syncing).
+    </div>
+  </div>
+
+<script>
+  const TIMEZONE = "Asia/Kolkata";
+  const CEFHUM_LAST_DAY = "2026-02-20";
+
+  function todayISO(){
+    const now = new Date();
+    const ist = new Date(now.toLocaleString("en-US", { timeZone: TIMEZONE }));
+    const y = ist.getFullYear();
+    const m = String(ist.getMonth()+1).padStart(2,'0');
+    const d = String(ist.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  function isSundayIST(){
+    const now = new Date();
+    const ist = new Date(now.toLocaleString("en-US", { timeZone: TIMEZONE }));
+    return ist.getDay() === 0;
+  }
+  function isAfterDate(a,b){ return a > b; }
+
+  const checklist = [
+    { id:"before_breakfast", title:"Before Breakfast", meta:"08:00", tasks:[
+      { id:"bb_bp", text:"Measure Blood Pressure", measurement:"bp" },
+      { id:"bb_sugar", text:"Measure Blood Sugar", measurement:"sugar" },
+      { id:"bb_novorapid", text:"Novorapid Insulin – 10 units" },
+      { id:"bb_panD", text:"Pan D tablet" },
+    ]},
+    { id:"after_breakfast", title:"After Breakfast", meta:"08:30", tasks:[
+      { id:"ab_cefhum", text:"Cefhum (course)", showIf:()=>!isAfterDate(todayISO(), CEFHUM_LAST_DAY) },
+      { id:"ab_metxl", text:"Met XL" },
+      { id:"ab_nikoran", text:"Nikoran" },
+      { id:"ab_lasilactone", text:"Lasilactone" },
+      { id:"ab_cobadex", text:"Cobadex" },
+      { id:"ab_folic", text:"Folic Acid" },
+      { id:"ab_ivabred", text:"Ivabred" },
+      { id:"ab_dolo_opt", text:"Dolo (optional)", optional:true },
+      { id:"ab_vitd_tayo", text:"Vit D Tayo (Sunday only)", showIf:()=>isSundayIST() },
+    ]},
+    { id:"before_lunch", title:"Before Lunch", meta:"13:00", tasks:[
+      { id:"bl_bp", text:"Measure Blood Pressure", measurement:"bp" },
+      { id:"bl_sugar", text:"Measure Blood Sugar", measurement:"sugar" },
+      { id:"bl_novorapid", text:"Novorapid Insulin – 12 units" },
+    ]},
+    { id:"after_lunch", title:"After Lunch", meta:"13:30", tasks:[
+      { id:"al_ecosprin", text:"Ecosprin" },
+      { id:"al_clopitab", text:"Clopitab" },
+    ]},
+    { id:"before_dinner", title:"Before Dinner", meta:"20:00", tasks:[
+      { id:"bd_bp", text:"Measure Blood Pressure", measurement:"bp" },
+      { id:"bd_sugar", text:"Measure Blood Sugar", measurement:"sugar" },
+      { id:"bd_novorapid", text:"Novorapid Insulin – 7 units" },
+    ]},
+    { id:"after_dinner_meds", title:"After Dinner Meds", meta:"20:30", tasks:[
+      { id:"adm_cefhum", text:"Cefhum (course)", showIf:()=>!isAfterDate(todayISO(), CEFHUM_LAST_DAY) },
+      { id:"adm_half_metxl", text:"½ Met XL" },
+      { id:"adm_nikoran", text:"Nikoran" },
+      { id:"adm_ivabred", text:"Ivabred" },
+    ]},
+    { id:"two_hours_after_dinner", title:"2 Hours After Dinner", meta:"22:30", tasks:[
+      { id:"2h_bp", text:"Measure Blood Pressure", measurement:"bp" },
+      { id:"2h_sugar", text:"Measure Blood Sugar", measurement:"sugar" },
+      { id:"2h_tresiba", text:"Tresiba Insulin – 16 units" },
+      { id:"2h_dolo_if_pain", text:"Dolo tablet (if pain)", optional:true },
+      { id:"2h_rosuva", text:"Rosuvastatin tablet" },
+    ]},
+  ];
+
+  const keyForToday = () => `dharini_${todayISO()}`;
+
+  const loadState = () => JSON.parse(localStorage.getItem(keyForToday()) || "{}");
+  const saveState = (s) => localStorage.setItem(keyForToday(), JSON.stringify(s));
+
+  function visibleTasks(){
+    const out = [];
+    for (const b of checklist){
+      for (const t of b.tasks){
+        if (t.showIf && !t.showIf()) continue;
+        out.push(t);
+      }
+    }
+    return out;
+  }
+
+  const blocksEl = document.getElementById("blocks");
+  const doneCountEl = document.getElementById("doneCount");
+  const barFillEl = document.getElementById("barFill");
+  const specialNoteEl = document.getElementById("specialNote");
+
+  function updateProgress(){
+    const state = loadState();
+    const tasks = visibleTasks();
+    const total = tasks.length;
+    const done = tasks.filter(t => state[t.id]?.done).length;
+    doneCountEl.textContent = `${done} / ${total} done`;
+    barFillEl.style.width = total ? `${Math.round((done/total)*100)}%` : "0%";
+
+    const notes = [];
+    if (isSundayIST()) notes.push("Sunday: Vit D Tayo is active");
+    if (!isAfterDate(todayISO(), CEFHUM_LAST_DAY)) notes.push("Cefhum course active (ends 20 Feb 2026)");
+    if (isAfterDate(todayISO(), CEFHUM_LAST_DAY)) notes.push("Cefhum course ended");
+    if (notes.length){
+      specialNoteEl.style.display = "inline-block";
+      specialNoteEl.textContent = notes[0];
+    } else specialNoteEl.style.display = "none";
+  }
+
+  function render(){
+    const state = loadState();
+    blocksEl.innerHTML = "";
+
+    for (const b of checklist){
+      const details = document.createElement("details");
+      details.open = false;
+
+      const summary = document.createElement("summary");
+      summary.innerHTML = `<div>${b.title}</div><div class="blockMeta">${b.meta}</div>`;
+      details.appendChild(summary);
+
+      const content = document.createElement("div");
+      content.className = "content";
+
+      const tasks = b.tasks.filter(t => !t.showIf || t.showIf());
+
+      for (const t of tasks){
+        const row = document.createElement("div");
+        row.className = "task";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = !!state[t.id]?.done;
+        cb.addEventListener("change", () => {
+          const s = loadState();
+          s[t.id] = s[t.id] || {};
+          s[t.id].done = cb.checked;
+          saveState(s);
+          updateProgress();
+        });
+
+        const label = document.createElement("div");
+        label.className = "label";
+        const title = document.createElement("strong");
+        title.textContent = t.text + (t.optional ? " (optional)" : "");
+        label.appendChild(title);
+
+        // Optional note
+        const note = document.createElement("input");
+        note.className = "note";
+        note.placeholder = "Notes (optional)";
+        note.value = state[t.id]?.note || "";
+        note.addEventListener("input", () => {
+          const s = loadState();
+          s[t.id] = s[t.id] || {};
+          s[t.id].note = note.value;
+          saveState(s);
+        });
+        label.appendChild(note);
+
+        // Optional measurement entry
+        if (t.measurement === "bp"){
+          const latest = state[t.id]?.bp ? `${state[t.id].bp.sys}/${state[t.id].bp.dia}` : "No BP recorded today";
+          const small = document.createElement("small");
+          small.textContent = `Latest BP: ${latest}`;
+          label.appendChild(small);
+
+          const sys = document.createElement("input");
+          sys.className = "note"; sys.placeholder = "Systolic (e.g., 120)"; sys.inputMode="numeric";
+
+          const dia = document.createElement("input");
+          dia.className = "note"; dia.placeholder = "Diastolic (e.g., 80)"; dia.inputMode="numeric";
+
+          const btn = document.createElement("button");
+          btn.className = "ghost";
+          btn.textContent = "Save BP (optional)";
+          btn.addEventListener("click", () => {
+            const sVal = parseInt(sys.value,10);
+            const dVal = parseInt(dia.value,10);
+            if (!Number.isFinite(sVal) || !Number.isFinite(dVal)) return alert("Enter valid BP numbers.");
+            const s = loadState();
+            s[t.id] = s[t.id] || {};
+            s[t.id].bp = { sys: sVal, dia: dVal };
+            saveState(s);
+            sys.value=""; dia.value="";
+            render(); updateProgress();
+          });
+
+          const row2 = document.createElement("div");
+          row2.className = "row";
+          row2.appendChild(sys); row2.appendChild(dia); row2.appendChild(btn);
+          label.appendChild(row2);
+        }
+
+        if (t.measurement === "sugar"){
+          const latest = state[t.id]?.sugar ? `${state[t.id].sugar.value} ${state[t.id].sugar.unit}` : "No sugar recorded today";
+          const small = document.createElement("small");
+          small.textContent = `Latest Sugar: ${latest}`;
+          label.appendChild(small);
+
+          const val = document.createElement("input");
+          val.className = "note"; val.placeholder = "Sugar value (e.g., 110)"; val.inputMode="decimal";
+
+          const unit = document.createElement("select");
+          unit.className = "note";
+          unit.innerHTML = `<option>mg/dL</option><option>mmol/L</option>`;
+
+          const btn = document.createElement("button");
+          btn.className = "ghost";
+          btn.textContent = "Save Sugar (optional)";
+          btn.addEventListener("click", () => {
+            const v = parseFloat(val.value);
+            if (!Number.isFinite(v)) return alert("Enter a valid sugar number.");
+            const s = loadState();
+            s[t.id] = s[t.id] || {};
+            s[t.id].sugar = { value: v, unit: unit.value };
+            saveState(s);
+            val.value="";
+            render(); updateProgress();
+          });
+
+          const row2 = document.createElement("div");
+          row2.className = "row";
+          row2.appendChild(val); row2.appendChild(unit); row2.appendChild(btn);
+          label.appendChild(row2);
+        }
+
+        row.appendChild(cb);
+        row.appendChild(label);
+        content.appendChild(row);
+      }
+
+      // Block actions
+      const actions = document.createElement("div");
+      actions.className = "row";
+
+      const markAll = document.createElement("button");
+      markAll.textContent = "Mark this block complete";
+      markAll.addEventListener("click", () => {
+        const s = loadState();
+        for (const t of tasks){
+          s[t.id] = s[t.id] || {};
+          s[t.id].done = true;
+        }
+        saveState(s);
+        render(); updateProgress();
+      });
+
+      const clear = document.createElement("button");
+      clear.className = "ghost";
+      clear.textContent = "Clear this block";
+      clear.addEventListener("click", () => {
+        const s = loadState();
+        for (const t of tasks){
+          if (s[t.id]) s[t.id].done = false;
+        }
+        saveState(s);
+        render(); updateProgress();
+      });
+
+      actions.appendChild(markAll);
+      actions.appendChild(clear);
+      content.appendChild(actions);
+
+      details.appendChild(content);
+      blocksEl.appendChild(details);
+    }
+
+    updateProgress();
+  }
+
+  // Header date
+  const now = new Date();
+  document.getElementById("today").textContent =
+    now.toLocaleDateString(undefined, { weekday:"long", year:"numeric", month:"long", day:"numeric" }) + " (IST)";
+
+  document.getElementById("resetDay").addEventListener("click", () => {
+    localStorage.removeItem(keyForToday());
+    render();
+  });
+  document.getElementById("expandAll").addEventListener("click", () => {
+    document.querySelectorAll("details").forEach(d => d.open = true);
+  });
+  document.getElementById("collapseAll").addEventListener("click", () => {
+    document.querySelectorAll("details").forEach(d => d.open = false);
+  });
+
+  render();
+</script>
+</body>
+</html>
