@@ -16,7 +16,6 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
 
 <style>
-/* ========= THEME TOKENS ========= */
 :root{
   --bg:#f6f7fb;
   --card:#ffffff;
@@ -29,8 +28,6 @@
   --btnText:#ffffff;
   --ghostBg:#eef0f6;
   --ghostText:#111111;
-  --chipBg:#111111;
-  --chipText:#ffffff;
   --progressBg:#e8eaf2;
   --progressFill:#2f6fed;
   --inputBg:#ffffff;
@@ -51,8 +48,6 @@ html[data-theme="dark"]{
   --btnText:#ffffff;
   --ghostBg:rgba(230,237,247,.10);
   --ghostText:#e6edf7;
-  --chipBg:rgba(230,237,247,.14);
-  --chipText:#e6edf7;
   --progressBg:rgba(230,237,247,.10);
   --progressFill:#4c8dff;
   --inputBg:rgba(230,237,247,.06);
@@ -61,7 +56,6 @@ html[data-theme="dark"]{
   --ok:#44d07f;
 }
 
-/* ========= BASE ========= */
 body{font-family:system-ui;background:var(--bg);color:var(--text);margin:0;padding:16px}
 h2{margin:0 0 12px 0}
 .nav{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -82,10 +76,8 @@ button:disabled{opacity:.55}
 .progress{height:8px;background:var(--progressBg);border-radius:999px;overflow:hidden;margin-bottom:8px}
 .progress div{height:100%;background:var(--progressFill);width:0%}
 .small{font-size:12px;color:var(--muted)}
-hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 .rowActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
-/* Theme toggle button */
 .themeBtn{
   display:inline-flex;align-items:center;gap:8px;
   padding:10px 14px;border-radius:10px;border:1px solid var(--borderSoft);
@@ -93,35 +85,6 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 }
 .themeDot{width:10px;height:10px;border-radius:999px;background:var(--progressFill)}
 
-/* Today-at-a-glance */
-.topCard{
-  background:var(--card);
-  border:1px solid var(--borderSoft);
-  border-radius:12px;
-  padding:12px;
-  box-shadow:var(--shadow);
-  margin-bottom:12px;
-}
-.pill{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:6px 10px;border-radius:999px;
-  border:1px solid var(--borderSoft);
-  background:var(--ghostBg);
-  font-weight:800;font-size:12px;
-}
-.pill.danger{background:rgba(214,44,44,.12);border-color:rgba(214,44,44,.22);color:var(--danger)}
-.pill.warn{background:rgba(180,83,9,.12);border-color:rgba(180,83,9,.22);color:var(--warn)}
-.pill.ok{background:rgba(15,157,88,.12);border-color:rgba(15,157,88,.22);color:var(--ok)}
-.kpiRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-.kpiLeft{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.missList{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
-.missItem{
-  padding:8px 10px;border-radius:10px;border:1px solid var(--borderSoft);
-  background:var(--card);
-  font-weight:800;font-size:12px;
-}
-.missItem.danger{border-color:rgba(214,44,44,.32);color:var(--danger)}
-.missItem.warn{border-color:rgba(180,83,9,.32);color:var(--warn)}
 /* Big keypad inputs */
 .bigInputs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .bigInputs input{width:110px;font-size:20px;padding:12px 12px}
@@ -158,17 +121,6 @@ hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
     <span class="themeDot"></span>
     <span id="themeLabel">Theme</span>
   </button>
-</div>
-
-<!-- Today at a Glance (NOT sticky) -->
-<div class="card" id="todayAtGlance">
-  <div class="blockTitle">Today at a Glance</div>
-  <div class="kpiRow">
-    <div class="kpiLeft">
-      <span class="pill" id="kpiCompletion">—</span>
-    </div>
-  </div>
-  <div class="missList" id="missList"></div>
 </div>
 
 <div class="progress"><div id="bar"></div></div>
@@ -285,7 +237,6 @@ let selectedDate = getISTDate();
 let activeDocRef = null;
 let unsubscribe = null;
 let commentsTimer = null;
-let latestDayDataCache = {};
 
 /* ================= HELPERS ================= */
 
@@ -334,6 +285,29 @@ function renderLastEdited(data){
   });
 }
 
+/* Target ranges + flags */
+const TARGETS = {
+  bp_sys_high: 140,
+  bp_dia_high: 90,
+  sugar_low: 70,
+  sugar_high: 180
+};
+
+function bpStatus(entry){
+  const sys = safeNum(entry?.sys);
+  const dia = safeNum(entry?.dia);
+  if(sys === null && dia === null) return "none";
+  if((sys !== null && sys >= TARGETS.bp_sys_high) || (dia !== null && dia >= TARGETS.bp_dia_high)) return "danger";
+  return "ok";
+}
+function sugarStatus(entry){
+  const v = safeNum(entry?.value);
+  if(v === null) return "none";
+  if(v < TARGETS.sugar_low) return "warn";
+  if(v > TARGETS.sugar_high) return "danger";
+  return "ok";
+}
+
 /* ================= CHECKLIST ================= */
 
 const blocks = [
@@ -351,7 +325,7 @@ const blocks = [
   title:"After Breakfast",
   key:"ab",
   tasks:[
-    { id:"ab_cefhum", text:"Cefhum", show:(d)=>!afterEnd(d)},
+    { id:"ab_ceftum", text:"Ceftum", show:(d)=>!afterEnd(d)},
     { id:"ab_metxl", text:"Met XL"},
     { id:"ab_nikoran", text:"Nikoran"},
     { id:"ab_lasilactone", text:"Lasilactone"},
@@ -392,7 +366,7 @@ const blocks = [
   title:"After Dinner",
   key:"ad",
   tasks:[
-    { id:"ad_cefhum", text:"Cefhum", show:(d)=>!afterEnd(d)},
+    { id:"ad_ceftum", text:"Ceftum", show:(d)=>!afterEnd(d)},
     { id:"ad_halfmet", text:"½ Met XL"},
     { id:"ad_nikoran", text:"Nikoran"},
     { id:"ad_ivabred", text:"Ivabred"}
@@ -427,64 +401,6 @@ function calcCompletionForDate(data, date){
   return { total, done, percent };
 }
 
-/* Missed detection: if required readings not done after a soft time cutoff */
-const REQUIRED_READINGS = [
-  { label: "Before Breakfast BP", id:"bb_bp", dueHour: 8, dueMinute: 30 },
-  { label: "Before Breakfast Sugar", id:"bb_sugar", dueHour: 8, dueMinute: 30 },
-  { label: "Before Lunch BP", id:"bl_bp", dueHour: 13, dueMinute: 30 },
-  { label: "Before Lunch Sugar", id:"bl_sugar", dueHour: 13, dueMinute: 30 },
-  { label: "Before Dinner BP", id:"bd_bp", dueHour: 20, dueMinute: 30 },
-  { label: "Before Dinner Sugar", id:"bd_sugar", dueHour: 20, dueMinute: 30 },
-  { label: "2 Hours After Dinner BP", id:"2h_bp", dueHour: 23, dueMinute: 0 },
-  { label: "2 Hours After Dinner Sugar", id:"2h_sugar", dueHour: 23, dueMinute: 0 }
-];
-
-function nowInIST(){
-  return new Date(new Date().toLocaleString("en-US",{timeZone:TIMEZONE}));
-}
-function minutesSinceMidnight(d){
-  return d.getHours()*60 + d.getMinutes();
-}
-function dueMinutes(item){ return item.dueHour*60 + item.dueMinute; }
-
-function computeMissedBadges(data){
-  const badges = [];
-  const now = nowInIST();
-  const nowM = minutesSinceMidnight(now);
-
-  for(const r of REQUIRED_READINGS){
-    if(nowM < dueMinutes(r)) continue;
-    const entry = data?.[r.id] || {};
-    if(!entry.done){
-      badges.push({ text: r.label + " missing", severity:"danger", taskId:r.id });
-    }
-  }
-  return badges;
-}
-
-/* Target ranges + flags (defaults; easy to tweak) */
-const TARGETS = {
-  bp_sys_high: 140,
-  bp_dia_high: 90,
-  sugar_low: 70,
-  sugar_high: 180
-};
-
-function bpStatus(entry){
-  const sys = safeNum(entry?.sys);
-  const dia = safeNum(entry?.dia);
-  if(sys === null && dia === null) return "none";
-  if((sys !== null && sys >= TARGETS.bp_sys_high) || (dia !== null && dia >= TARGETS.bp_dia_high)) return "danger";
-  return "ok";
-}
-function sugarStatus(entry){
-  const v = safeNum(entry?.value);
-  if(v === null) return "none";
-  if(v < TARGETS.sugar_low) return "warn";
-  if(v > TARGETS.sugar_high) return "danger";
-  return "ok";
-}
-
 /* ================= LOAD DAY ================= */
 
 function loadDay(){
@@ -499,50 +415,12 @@ function loadDay(){
 
   unsubscribe = activeDocRef.onSnapshot(doc=>{
     const d = doc.data() || {};
-    latestDayDataCache = d;
     render(d);
     loadCommentsIntoBox(d);
     renderLastEdited(d);
-    renderAtAGlance(d);
   });
 
   loadTrends();
-}
-
-/* ================= TODAY AT A GLANCE ================= */
-
-function renderAtAGlance(dayData){
-  const c = calcCompletionForDate(dayData, selectedDate);
-
-  const kpiCompletion = document.getElementById("kpiCompletion");
-  if(kpiCompletion){
-    kpiCompletion.textContent = `${c.percent}% complete (${c.done}/${c.total})`;
-    kpiCompletion.className = "pill " + (c.percent >= 85 ? "ok" : (c.percent >= 50 ? "warn" : "danger"));
-  }
-
-  const missList = document.getElementById("missList");
-  if(missList){
-    missList.innerHTML = "";
-    const missed = computeMissedBadges(dayData);
-
-    if(missed.length === 0){
-      const s = document.createElement("span");
-      s.className = "pill ok";
-      s.textContent = "No missed BP/Sugar checkpoints (so far)";
-      missList.appendChild(s);
-    } else {
-      missed.forEach(m=>{
-        const d = document.createElement("div");
-        d.className = "missItem " + (m.severity === "danger" ? "danger" : "warn");
-        d.textContent = m.text;
-        d.onclick = ()=> {
-          const el = document.getElementById("task_"+m.taskId);
-          if(el) el.scrollIntoView({ behavior:"smooth", block:"center" });
-        };
-        missList.appendChild(d);
-      });
-    }
-  }
 }
 
 /* ================= RENDER UI ================= */
@@ -584,7 +462,6 @@ function render(data){
       row.appendChild(cb);
       row.append(" " + task.text);
 
-      // Flag badge next to reading tasks
       if(task.type === "bp"){
         const st = bpStatus(data?.[task.id]);
         if(st !== "none"){
@@ -733,7 +610,7 @@ function wireCommentsAutosave(){
   });
 }
 
-/* ================= TRENDS (ALL SLOTS) ================= */
+/* ================= TRENDS ================= */
 
 let bpChart = null;
 let sugarChart = null;
@@ -780,14 +657,11 @@ async function loadTrends(){
 
   bpChart = new Chart(document.getElementById("bpChart"),{
     type:"line",
-    data:{
-      labels,
-      datasets:[
-        { label:"Systolic", data: sysData },
-        { label:"Diastolic", data: diaData },
-        { label:"Pulse", data: pulseData }
-      ]
-    },
+    data:{ labels, datasets:[
+      { label:"Systolic", data: sysData },
+      { label:"Diastolic", data: diaData },
+      { label:"Pulse", data: pulseData }
+    ]},
     options:{
       responsive:true,
       plugins:{legend:{labels:{color:textCol}}},
@@ -812,7 +686,7 @@ async function loadTrends(){
   });
 }
 
-/* ================= EXPORT (RECODED, RELIABLE) ================= */
+/* ================= EXPORT ================= */
 
 const BP_SLOTS = [
   { label: "Before Breakfast", id: "bb_bp" },
@@ -980,11 +854,6 @@ document.getElementById("datePicker").onchange = e=>{
 applyTheme(getSavedTheme());
 wireCommentsAutosave();
 loadDay();
-
-/* Refresh missed badges every minute */
-setInterval(()=>{
-  if(latestDayDataCache) renderAtAGlance(latestDayDataCache);
-}, 60*1000);
 </script>
 
 </body>
