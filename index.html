@@ -16,21 +16,81 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
 
 <style>
-body{font-family:system-ui;background:#f6f7fb;margin:0;padding:16px}
+/* ========= THEME TOKENS ========= */
+:root{
+  --bg:#f6f7fb;
+  --card:#ffffff;
+  --text:#0f172a;
+  --muted:rgba(15,23,42,.75);
+  --shadow:0 6px 24px rgba(0,0,0,.06);
+  --border:#dddddd;
+  --borderSoft:#eeeeee;
+  --primary:#2f6fed;
+  --btnText:#ffffff;
+  --ghostBg:#eef0f6;
+  --ghostText:#111111;
+  --chipBg:#111111;
+  --chipText:#ffffff;
+  --progressBg:#e8eaf2;
+  --progressFill:#2f6fed;
+  --inputBg:#ffffff;
+}
+
+html[data-theme="dark"]{
+  --bg:#0b1220;
+  --card:#0f1a2d;
+  --text:#e6edf7;
+  --muted:rgba(230,237,247,.72);
+  --shadow:0 10px 28px rgba(0,0,0,.45);
+  --border:rgba(230,237,247,.16);
+  --borderSoft:rgba(230,237,247,.10);
+  --primary:#4c8dff;
+  --btnText:#ffffff;
+  --ghostBg:rgba(230,237,247,.10);
+  --ghostText:#e6edf7;
+  --chipBg:rgba(230,237,247,.14);
+  --chipText:#e6edf7;
+  --progressBg:rgba(230,237,247,.10);
+  --progressFill:#4c8dff;
+  --inputBg:rgba(230,237,247,.06);
+}
+
+/* ========= BASE ========= */
+body{font-family:system-ui;background:var(--bg);color:var(--text);margin:0;padding:16px}
 h2{margin:0 0 12px 0}
 .nav{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);border:1px solid var(--borderSoft)}
 .blockTitle{font-weight:900;margin-bottom:10px}
 .task{margin-bottom:12px}
-input,textarea{padding:8px;border-radius:8px;border:1px solid #ddd;margin:4px}
-button,.btn{padding:10px 14px;border-radius:10px;border:0;background:#2f6fed;color:#fff;font-weight:800;display:inline-block;text-decoration:none}
-button.ghost,.btn.ghost{background:#eef0f6;color:#111}
+input,textarea{
+  padding:8px;border-radius:8px;border:1px solid var(--border);
+  margin:4px;background:var(--inputBg);color:var(--text)
+}
+input::placeholder, textarea::placeholder{color:var(--muted)}
+button,.btn{
+  padding:10px 14px;border-radius:10px;border:0;background:var(--primary);
+  color:var(--btnText);font-weight:800;display:inline-block;text-decoration:none
+}
+button.ghost,.btn.ghost{background:var(--ghostBg);color:var(--ghostText)}
 button:disabled{opacity:.55}
-.progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:8px}
-.progress div{height:100%;background:#2f6fed;width:0%}
-.small{font-size:12px;opacity:.75}
-hr{border:none;border-top:1px solid #eee;margin:12px 0}
+.progress{height:8px;background:var(--progressBg);border-radius:999px;overflow:hidden;margin-bottom:8px}
+.progress div{height:100%;background:var(--progressFill);width:0%}
+.small{font-size:12px;color:var(--muted)}
+hr{border:none;border-top:1px solid var(--borderSoft);margin:12px 0}
 .rowActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Theme toggle button */
+.themeBtn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 14px;border-radius:10px;border:1px solid var(--borderSoft);
+  background:var(--ghostBg);color:var(--ghostText);font-weight:800;
+}
+.themeDot{
+  width:10px;height:10px;border-radius:999px;background:var(--progressFill);
+}
+
+/* Improve chart canvas in dark mode */
+canvas{background:transparent}
 </style>
 </head>
 
@@ -47,6 +107,12 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0}
   <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
     Add Reminders to phone
   </a>
+
+  <!-- Dark mode toggle -->
+  <button class="themeBtn" id="themeToggle" type="button" onclick="toggleTheme()">
+    <span class="themeDot"></span>
+    <span id="themeLabel">Dark mode</span>
+  </button>
 </div>
 
 <div class="progress"><div id="bar"></div></div>
@@ -88,6 +154,73 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0}
 </div>
 
 <script>
+/* ================= THEME (DARK MODE) ================= */
+
+function getSavedTheme(){
+  return localStorage.getItem("theme") || "system";
+}
+
+function getSystemTheme(){
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme){
+  // theme can be: "light" | "dark" | "system"
+  const effective = theme === "system" ? getSystemTheme() : theme;
+  document.documentElement.setAttribute("data-theme", effective);
+
+  // label
+  const label = document.getElementById("themeLabel");
+  if(label){
+    if(theme === "system"){
+      label.textContent = "Theme: System";
+    } else if(theme === "dark"){
+      label.textContent = "Theme: Dark";
+    } else {
+      label.textContent = "Theme: Light";
+    }
+  }
+
+  // refresh charts so labels/ticks remain readable
+  refreshChartColors(effective);
+}
+
+function toggleTheme(){
+  // Cycle: system -> dark -> light -> system
+  const current = getSavedTheme();
+  const next = current === "system" ? "dark" : (current === "dark" ? "light" : "system");
+  localStorage.setItem("theme", next);
+  applyTheme(next);
+  loadTrends(); // re-render charts with new styles
+}
+
+// React to system theme changes if user chose "system"
+if(window.matchMedia){
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
+    if(getSavedTheme() === "system"){
+      applyTheme("system");
+      loadTrends();
+    }
+  });
+}
+
+/* Chart styling helpers */
+function isDarkNow(){
+  return document.documentElement.getAttribute("data-theme") === "dark";
+}
+
+function chartTextColor(){
+  return isDarkNow() ? "rgba(230,237,247,.85)" : "rgba(15,23,42,.85)";
+}
+
+function chartGridColor(){
+  return isDarkNow() ? "rgba(230,237,247,.12)" : "rgba(15,23,42,.12)";
+}
+
+function refreshChartColors(){
+  // no-op; kept for clarity
+}
+
 /* ================= FIREBASE ================= */
 
 const firebaseConfig = {
@@ -437,6 +570,9 @@ async function loadTrends(){
   if(bpChart) bpChart.destroy();
   if(sugarChart) sugarChart.destroy();
 
+  const textCol = chartTextColor();
+  const gridCol = chartGridColor();
+
   bpChart = new Chart(document.getElementById("bpChart"),{
     type:"line",
     data:{
@@ -447,13 +583,27 @@ async function loadTrends(){
         { label:"Pulse", data: pulseData }
       ]
     },
-    options:{ responsive:true, plugins:{legend:{display:true}} }
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:textCol}}},
+      scales:{
+        x:{ticks:{color:textCol},grid:{color:gridCol}},
+        y:{ticks:{color:textCol},grid:{color:gridCol}}
+      }
+    }
   });
 
   sugarChart = new Chart(document.getElementById("sugarChart"),{
     type:"line",
     data:{ labels, datasets:[ { label:"Sugar", data: sugarData } ] },
-    options:{ responsive:true, plugins:{legend:{display:true}} }
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:textCol}}},
+      scales:{
+        x:{ticks:{color:textCol},grid:{color:gridCol}},
+        y:{ticks:{color:textCol},grid:{color:gridCol}}
+      }
+    }
   });
 }
 
@@ -511,7 +661,6 @@ async function exportToPDF(){
   try{
     setExportUI(true, "Preparing data…");
 
-    // Query all docs from EXPORT_START_DATE up to selectedDate inclusive
     const snap = await db.collection("boards")
       .doc(BOARD_ID)
       .collection("days")
@@ -520,11 +669,9 @@ async function exportToPDF(){
       .endAt(selectedDate)
       .get();
 
-    // Build ordered day list
     const days = [];
     snap.forEach(doc => days.push({ date: doc.id, data: doc.data() || {} }));
 
-    // Ensure selected date exists in report even if no doc yet
     if(!days.find(d => d.date === selectedDate)){
       days.push({ date: selectedDate, data: {} });
     }
@@ -539,7 +686,6 @@ async function exportToPDF(){
     const pageWidth = doc.internal.pageSize.getWidth();
     const marginX = 40;
 
-    // Cover header
     doc.setFontSize(16);
     doc.text("Dharini Checklist Report", marginX, 50);
 
@@ -549,12 +695,10 @@ async function exportToPDF(){
 
     let y = 110;
 
-    // For each day, print BP and Sugar tables + comments
     for(let i=0; i<days.length; i++){
       const day = days[i];
       const data = day.data || {};
 
-      // Add page break if needed
       if(y > 740){
         doc.addPage();
         y = 50;
@@ -564,7 +708,6 @@ async function exportToPDF(){
       doc.text(day.date, marginX, y);
       y += 10;
 
-      // Comments
       const comments = (data.__comments || "").trim();
       doc.setFontSize(10);
       if(comments){
@@ -576,14 +719,9 @@ async function exportToPDF(){
         y += 34;
       }
 
-      // BP table
       const bpRows = BP_SLOTS.map(s => {
         const entry = data[s.id] || {};
-        return [
-          s.label,
-          entry.done ? "Done" : "",
-          getBPString(entry) || "—"
-        ];
+        return [ s.label, entry.done ? "Done" : "", getBPString(entry) || "—" ];
       });
 
       doc.autoTable({
@@ -598,14 +736,9 @@ async function exportToPDF(){
 
       y = doc.lastAutoTable.finalY + 14;
 
-      // Sugar table
       const sugarRows = SUGAR_SLOTS.map(s => {
         const entry = data[s.id] || {};
-        return [
-          s.label,
-          entry.done ? "Done" : "",
-          getSugarString(entry) || "—"
-        ];
+        return [ s.label, entry.done ? "Done" : "", getSugarString(entry) || "—" ];
       });
 
       doc.autoTable({
@@ -638,6 +771,12 @@ document.getElementById("datePicker").onchange = e=>{
   selectedDate = e.target.value;
   loadDay();
 };
+
+// Apply saved theme on load
+applyTheme(getSavedTheme());
+
+// Ensure button label is correct immediately
+applyTheme(getSavedTheme());
 
 wireCommentsAutosave();
 loadDay();
