@@ -12,14 +12,14 @@
 
 <style>
 body{font-family:system-ui;background:#f6f7fb;margin:0;padding:16px}
-h2{margin-top:0}
+h2{margin:0 0 12px 0}
 .nav{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
 .blockTitle{font-weight:900;margin-bottom:10px}
 .task{margin-bottom:12px}
-input,textarea{padding:6px;border-radius:6px;border:1px solid #ddd;margin:4px}
-button{padding:8px 12px;border-radius:8px;border:0;background:#2f6fed;color:#fff;font-weight:800}
-button.ghost{background:#eef0f6;color:#111}
+input,textarea{padding:8px;border-radius:8px;border:1px solid #ddd;margin:4px}
+button,.btn{padding:10px 14px;border-radius:10px;border:0;background:#2f6fed;color:#fff;font-weight:800;display:inline-block;text-decoration:none}
+button.ghost,.btn.ghost{background:#eef0f6;color:#111}
 .progress{height:8px;background:#e8eaf2;border-radius:999px;overflow:hidden;margin-bottom:8px}
 .progress div{height:100%;background:#2f6fed;width:0%}
 .small{font-size:12px;opacity:.75}
@@ -29,6 +29,7 @@ table{width:100%;border-collapse:collapse}
 td,th{border:1px solid #ddd;padding:8px;font-size:12px;vertical-align:top}
 th{background:#f5f5f5;text-align:left}
 .pdfWrap{background:#fff;padding:16px}
+.rowActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style>
 </head>
 
@@ -40,11 +41,12 @@ th{background:#f5f5f5;text-align:left}
   <button onclick="shiftDay(-1)">◀ Previous</button>
   <input type="date" id="datePicker">
   <button onclick="shiftDay(1)">Next ▶</button>
-</div>
 
+  <!-- Install Shortcut (Option B) -->
   <a class="btn ghost" href="https://www.icloud.com/shortcuts/e5923e2e7c014ae5b8478bd3cb6326fb" target="_blank" rel="noopener">
-  Add Reminders to phone
-</a>
+    Add Reminders to phone
+  </a>
+</div>
 
 <div class="progress"><div id="bar"></div></div>
 <div id="percent"></div>
@@ -52,28 +54,41 @@ th{background:#f5f5f5;text-align:left}
 <div id="app"></div>
 
 <div class="card">
-  <h3>Comments (for selected day)</h3>
-  <textarea id="dayComments" rows="5" style="width:100%"></textarea>
+  <h3 style="margin:0 0 8px 0;">Comments (for selected day)</h3>
+  <div class="small">Symptoms, missed dose reason, appetite, sleep, doctor notes.</div>
+  <textarea id="dayComments" rows="5" style="width:100%;margin-top:10px"></textarea>
   <div class="small" id="commentsStatus"></div>
 </div>
 
 <div class="card">
-  <h3>Trends (Last 30 Days)</h3>
+  <h3 style="margin:0 0 8px 0;">Trends (Last 30 Days)</h3>
   <canvas id="bpChart"></canvas>
+  <div style="height:10px"></div>
   <canvas id="sugarChart"></canvas>
+  <div class="small" style="margin-top:8px;">Charts use the Before Breakfast readings as the baseline.</div>
 </div>
 
 <div class="card">
-  <h3>Export</h3>
-  <button onclick="exportSelectedDayPDF()">Export Selected Day</button>
-  <button class="ghost" onclick="exportSelectedPlusPreviousPDF()">Export Up To Selected</button>
-  <button class="ghost" onclick="exportLastNDaysPDF(30)">Export Last 30 Days</button>
+  <h3 style="margin:0 0 8px 0;">Export</h3>
+  <div class="small">Tip: “Up to selected” can get heavy on iPhone/iPad if you have many days. If it fails, export last 30 days.</div>
+  <div class="rowActions" style="margin-top:10px">
+    <button onclick="exportSelectedDayPDF()">Export Selected Day (PDF)</button>
+    <button class="ghost" onclick="exportSelectedPlusPreviousPDF()">Export Up To Selected (PDF)</button>
+    <button class="ghost" onclick="exportLastNDaysPDF(30)">Export Last 30 Days (PDF)</button>
+  </div>
 </div>
 
+<div class="card" style="text-align:center">
+  <div class="small">
+    Last Edited:
+    <span id="lastEditedValue">—</span>
+  </div>
+</div>
+
+<!-- Hidden container for PDF rendering -->
 <div id="pdfContainer" style="position:absolute;left:-99999px;top:-99999px;width:800px"></div>
 
 <script>
-
 /* ================= FIREBASE ================= */
 
 const firebaseConfig = {
@@ -93,182 +108,242 @@ const db = firebase.firestore();
 const BOARD_ID="dharini-global-board";
 const TIMEZONE="Asia/Kolkata";
 const CEFHUM_END="2026-02-20";
-let selectedDate=getISTDate();
-let activeDocRef=null;
-let unsubscribe=null;
-let commentsTimer=null;
+
+let selectedDate = getISTDate();
+let activeDocRef = null;
+let unsubscribe = null;
+let commentsTimer = null;
 
 /* ================= HELPERS ================= */
 
 function getISTDate(dateObj=null){
-  const now=dateObj||new Date();
-  const ist=new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
+  const now = dateObj || new Date();
+  const ist = new Date(now.toLocaleString("en-US",{timeZone:TIMEZONE}));
   return ist.toISOString().split("T")[0];
 }
 
 function shiftDay(days){
-  const d=new Date(selectedDate);
+  const d = new Date(selectedDate);
   d.setDate(d.getDate()+days);
-  selectedDate=getISTDate(d);
+  selectedDate = getISTDate(d);
   loadDay();
 }
 
-function afterEnd(date){return date>CEFHUM_END;}
-function isSunday(date){return new Date(date).getDay()===0;}
+function afterEnd(date){ return date > CEFHUM_END; }
+function isSunday(date){ return new Date(date).getDay() === 0; }
 
 function safeNum(x){
-  const n=Number(x);
-  return Number.isFinite(n)?n:null;
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+function escapeHtml(str){
+  return String(str)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function updateLastEdited(){
+  if(!activeDocRef) return;
+  activeDocRef.set({
+    __lastEdited: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge:true });
+}
+
+function renderLastEdited(data){
+  const el = document.getElementById("lastEditedValue");
+  if(!el) return;
+
+  if(!data.__lastEdited){
+    el.textContent = "No edits yet";
+    return;
+  }
+
+  const ts = data.__lastEdited.toDate();
+  el.textContent = ts.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
 }
 
 /* ================= CHECKLIST ================= */
 
-const blocks=[
+const blocks = [
 {
-title:"Before Breakfast",
-tasks:[
-{id:"bb_bp",text:"Measure BP",type:"bp"},
-{id:"bb_sugar",text:"Measure Sugar",type:"sugar"},
-{id:"bb_novo10",text:"Novorapid 10u"},
-{id:"bb_panD",text:"Pan D"}
-]},
+  title:"Before Breakfast",
+  tasks:[
+    { id:"bb_bp", text:"Measure BP", type:"bp"},
+    { id:"bb_sugar", text:"Measure Sugar", type:"sugar"},
+    { id:"bb_novo10", text:"Novorapid 10u"},
+    { id:"bb_panD", text:"Pan D"}
+  ]
+},
 {
-title:"After Breakfast",
-tasks:[
-{id:"ab_cefhum",text:"Cefhum",show:(d)=>!afterEnd(d)},
-{id:"ab_metxl",text:"Met XL"},
-{id:"ab_nikoran",text:"Nikoran"},
-{id:"ab_lasilactone",text:"Lasilactone"},
-{id:"ab_cobadex",text:"Cobadex"},
-{id:"ab_folic",text:"Folic Acid"},
-{id:"ab_ivabred",text:"Ivabred"},
-{id:"ab_dolo",text:"Dolo (optional)"},
-{id:"ab_vitd",text:"Vit D (Sunday only)",show:(d)=>isSunday(d)}
-]},
+  title:"After Breakfast",
+  tasks:[
+    { id:"ab_cefhum", text:"Cefhum", show:(d)=>!afterEnd(d)},
+    { id:"ab_metxl", text:"Met XL"},
+    { id:"ab_nikoran", text:"Nikoran"},
+    { id:"ab_lasilactone", text:"Lasilactone"},
+    { id:"ab_cobadex", text:"Cobadex"},
+    { id:"ab_folic", text:"Folic Acid"},
+    { id:"ab_ivabred", text:"Ivabred"},
+    { id:"ab_dolo", text:"Dolo (optional)"},
+    { id:"ab_vitd", text:"Vit D (Sunday only)", show:(d)=>isSunday(d)}
+  ]
+},
 {
-title:"Before Lunch",
-tasks:[
-{id:"bl_bp",text:"Measure BP",type:"bp"},
-{id:"bl_sugar",text:"Measure Sugar",type:"sugar"},
-{id:"bl_novo12",text:"Novorapid 12u"}
-]},
+  title:"Before Lunch",
+  tasks:[
+    { id:"bl_bp", text:"Measure BP", type:"bp"},
+    { id:"bl_sugar", text:"Measure Sugar", type:"sugar"},
+    { id:"bl_novo12", text:"Novorapid 12u"}
+  ]
+},
 {
-title:"After Lunch",
-tasks:[
-{id:"al_ecosprin",text:"Ecosprin"},
-{id:"al_clopitab",text:"Clopitab"}
-]},
+  title:"After Lunch",
+  tasks:[
+    { id:"al_ecosprin", text:"Ecosprin"},
+    { id:"al_clopitab", text:"Clopitab"}
+  ]
+},
 {
-title:"Before Dinner",
-tasks:[
-{id:"bd_bp",text:"Measure BP",type:"bp"},
-{id:"bd_sugar",text:"Measure Sugar",type:"sugar"},
-{id:"bd_novo7",text:"Novorapid 7u"}
-]},
+  title:"Before Dinner",
+  tasks:[
+    { id:"bd_bp", text:"Measure BP", type:"bp"},
+    { id:"bd_sugar", text:"Measure Sugar", type:"sugar"},
+    { id:"bd_novo7", text:"Novorapid 7u"}
+  ]
+},
 {
-title:"After Dinner Meds",
-tasks:[
-{id:"ad_cefhum",text:"Cefhum",show:(d)=>!afterEnd(d)},
-{id:"ad_halfmet",text:"½ Met XL"},
-{id:"ad_nikoran",text:"Nikoran"},
-{id:"ad_ivabred",text:"Ivabred"}
-]},
+  title:"After Dinner Meds",
+  tasks:[
+    { id:"ad_cefhum", text:"Cefhum", show:(d)=>!afterEnd(d)},
+    { id:"ad_halfmet", text:"½ Met XL"},
+    { id:"ad_nikoran", text:"Nikoran"},
+    { id:"ad_ivabred", text:"Ivabred"}
+  ]
+},
 {
-title:"2 Hours After Dinner",
-tasks:[
-{id:"2h_bp",text:"Measure BP",type:"bp"},
-{id:"2h_sugar",text:"Measure Sugar",type:"sugar"},
-{id:"2h_tresiba",text:"Tresiba 16u"},
-{id:"2h_dolo",text:"Dolo (if pain)"},
-{id:"2h_rosuva",text:"Rosuvastatin"}
-]}
+  title:"2 Hours After Dinner",
+  tasks:[
+    { id:"2h_bp", text:"Measure BP", type:"bp"},
+    { id:"2h_sugar", text:"Measure Sugar", type:"sugar"},
+    { id:"2h_tresiba", text:"Tresiba 16u"},
+    { id:"2h_dolo", text:"Dolo (if pain)"},
+    { id:"2h_rosuva", text:"Rosuvastatin"}
+  ]
+}
 ];
+
+function visibleTasksForDate(block, date){
+  return block.tasks.filter(t => !t.show || t.show(date));
+}
+
+function calcCompletionForDate(data, date){
+  let total = 0, done = 0;
+  blocks.forEach(b=>{
+    visibleTasksForDate(b, date).forEach(t=>{
+      total++;
+      if(data?.[t.id]?.done) done++;
+    });
+  });
+  const percent = total ? Math.round((done/total)*100) : 0;
+  return { total, done, percent };
+}
 
 /* ================= LOAD DAY ================= */
 
 function loadDay(){
+  if(unsubscribe) unsubscribe();
 
-  if(unsubscribe)unsubscribe();
+  document.getElementById("datePicker").value = selectedDate;
 
-  document.getElementById("datePicker").value=selectedDate;
-
-  activeDocRef=db.collection("boards")
+  activeDocRef = db.collection("boards")
     .doc(BOARD_ID)
     .collection("days")
     .doc(selectedDate);
 
-  unsubscribe=activeDocRef.onSnapshot(doc=>{
-    const d=doc.data()||{};
+  unsubscribe = activeDocRef.onSnapshot(doc=>{
+    const d = doc.data() || {};
     render(d);
-    loadComments(d);
+    loadCommentsIntoBox(d);
+    renderLastEdited(d);
   });
 
   loadTrends();
 }
 
-/* ================= RENDER ================= */
+/* ================= RENDER UI ================= */
 
 function render(data){
+  const app = document.getElementById("app");
+  app.innerHTML = "";
 
-  const app=document.getElementById("app");
-  app.innerHTML="";
-  let total=0,done=0;
+  let total = 0, done = 0;
 
   blocks.forEach(block=>{
-    const card=document.createElement("div");
-    card.className="card";
+    const card = document.createElement("div");
+    card.className = "card";
 
-    const title=document.createElement("div");
-    title.className="blockTitle";
-    title.textContent=block.title;
+    const title = document.createElement("div");
+    title.className = "blockTitle";
+    title.textContent = block.title;
     card.appendChild(title);
 
-    block.tasks.forEach(task=>{
-      if(task.show && !task.show(selectedDate))return;
-
+    visibleTasksForDate(block, selectedDate).forEach(task=>{
       total++;
 
-      const row=document.createElement("div");
-      row.className="task";
+      const row = document.createElement("div");
+      row.className = "task";
 
-      const cb=document.createElement("input");
-      cb.type="checkbox";
-      cb.checked=data?.[task.id]?.done||false;
-      if(cb.checked)done++;
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = data?.[task.id]?.done || false;
+      if(cb.checked) done++;
 
-      cb.onchange=()=>{
+      cb.onchange = ()=>{
         activeDocRef.set({
-          [task.id]:{...data?.[task.id],done:cb.checked}
-        },{merge:true});
+          [task.id]: { ...data?.[task.id], done: cb.checked }
+        }, { merge:true });
+        updateLastEdited();
       };
 
       row.appendChild(cb);
-      row.append(" "+task.text);
+      row.append(" " + task.text);
 
-      if(task.type==="bp"){
-        const sys=document.createElement("input");
-        sys.placeholder="Sys";
-        sys.value=data?.[task.id]?.sys||"";
+      if(task.type === "bp"){
+        const sys = document.createElement("input");
+        sys.placeholder = "Sys";
+        sys.value = data?.[task.id]?.sys || "";
+        sys.inputMode = "numeric";
 
-        const dia=document.createElement("input");
-        dia.placeholder="Dia";
-        dia.value=data?.[task.id]?.dia||"";
+        const dia = document.createElement("input");
+        dia.placeholder = "Dia";
+        dia.value = data?.[task.id]?.dia || "";
+        dia.inputMode = "numeric";
 
-        const pulse=document.createElement("input");
-        pulse.placeholder="Pulse";
-        pulse.value=data?.[task.id]?.pulse||"";
+        const pulse = document.createElement("input");
+        pulse.placeholder = "Pulse";
+        pulse.value = data?.[task.id]?.pulse || "";
+        pulse.inputMode = "numeric";
 
-        const save=document.createElement("button");
-        save.textContent="Save BP";
-        save.onclick=()=>{
+        const save = document.createElement("button");
+        save.textContent = "Save BP";
+        save.onclick = ()=>{
           activeDocRef.set({
-            [task.id]:{
-              done:true,
-              sys:sys.value,
-              dia:dia.value,
-              pulse:pulse.value
+            [task.id]: {
+              done: true,
+              sys: sys.value,
+              dia: dia.value,
+              pulse: pulse.value
             }
-          },{merge:true});
+          }, { merge:true });
+          updateLastEdited();
         };
 
         row.appendChild(document.createElement("br"));
@@ -276,27 +351,41 @@ function render(data){
         row.appendChild(dia);
         row.appendChild(pulse);
         row.appendChild(save);
+
+        const entry = data?.[task.id] || {};
+        const last = (entry.sys && entry.dia)
+          ? `${entry.sys}/${entry.dia}` + (entry.pulse ? ` (Pulse ${entry.pulse})` : "")
+          : "—";
+        row.appendChild(document.createElement("br"));
+        row.appendChild(smallText("Saved: " + last));
       }
 
-      if(task.type==="sugar"){
-        const val=document.createElement("input");
-        val.placeholder="Sugar";
-        val.value=data?.[task.id]?.value||"";
+      if(task.type === "sugar"){
+        const val = document.createElement("input");
+        val.placeholder = "Sugar";
+        val.value = data?.[task.id]?.value || "";
+        val.inputMode = "decimal";
 
-        const save=document.createElement("button");
-        save.textContent="Save Sugar";
-        save.onclick=()=>{
+        const save = document.createElement("button");
+        save.textContent = "Save Sugar";
+        save.onclick = ()=>{
           activeDocRef.set({
-            [task.id]:{
-              done:true,
-              value:val.value
+            [task.id]: {
+              done: true,
+              value: val.value
             }
-          },{merge:true});
+          }, { merge:true });
+          updateLastEdited();
         };
 
         row.appendChild(document.createElement("br"));
         row.appendChild(val);
         row.appendChild(save);
+
+        const entry = data?.[task.id] || {};
+        const last = entry.value ? `${entry.value}` : "—";
+        row.appendChild(document.createElement("br"));
+        row.appendChild(smallText("Saved: " + last));
       }
 
       card.appendChild(row);
@@ -305,139 +394,256 @@ function render(data){
     app.appendChild(card);
   });
 
-  const percent=Math.round((done/total)*100)||0;
-  document.getElementById("bar").style.width=percent+"%";
-  document.getElementById("percent").textContent=
-    percent+"% Complete ("+selectedDate+")";
+  const percent = total ? Math.round((done/total)*100) : 0;
+  document.getElementById("bar").style.width = percent + "%";
+  document.getElementById("percent").textContent = percent + "% Complete (" + selectedDate + ")";
+}
+
+function smallText(t){
+  const s = document.createElement("div");
+  s.className = "small";
+  s.textContent = t;
+  return s;
 }
 
 /* ================= COMMENTS ================= */
 
-function loadComments(data){
-  const box=document.getElementById("dayComments");
-  box.value=data.__comments||"";
+function loadCommentsIntoBox(dayData){
+  const box = document.getElementById("dayComments");
+  if(!box) return;
+
+  const incoming = dayData.__comments || "";
+  if(document.activeElement !== box && box.value !== incoming){
+    box.value = incoming;
+  }
+
+  const status = document.getElementById("commentsStatus");
+  if(status) status.textContent = "";
 }
 
-document.getElementById("dayComments").addEventListener("input",()=>{
-  if(commentsTimer)clearTimeout(commentsTimer);
-  commentsTimer=setTimeout(()=>{
-    activeDocRef.set({
-      __comments:document.getElementById("dayComments").value
-    },{merge:true});
-  },400);
-});
+function wireCommentsAutosave(){
+  const box = document.getElementById("dayComments");
+  if(!box) return;
+
+  box.addEventListener("input", ()=>{
+    const status = document.getElementById("commentsStatus");
+    if(status) status.textContent = "Saving…";
+
+    if(commentsTimer) clearTimeout(commentsTimer);
+
+    commentsTimer = setTimeout(async ()=>{
+      try{
+        if(!activeDocRef) return;
+        await activeDocRef.set({
+          __comments: box.value,
+          __lastEdited: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge:true });
+        if(status) status.textContent = "Saved";
+      } catch(e){
+        if(status) status.textContent = "Save failed (check internet)";
+      }
+    }, 400);
+  });
+}
 
 /* ================= TRENDS ================= */
 
-let bpChart=null;
-let sugarChart=null;
+let bpChart = null;
+let sugarChart = null;
 
 async function loadTrends(){
-
-  const snap=await db.collection("boards")
+  const snapshot = await db.collection("boards")
     .doc(BOARD_ID)
     .collection("days")
     .orderBy(firebase.firestore.FieldPath.documentId())
     .limitToLast(30)
     .get();
 
-  const labels=[],sys=[],dia=[],pulse=[],sugar=[];
+  const labels = [];
+  const sysData = [];
+  const diaData = [];
+  const pulseData = [];
+  const sugarData = [];
 
-  snap.forEach(doc=>{
-    const d=doc.data();
+  snapshot.forEach(doc=>{
+    const d = doc.data();
     labels.push(doc.id);
-    sys.push(safeNum(d?.bb_bp?.sys));
-    dia.push(safeNum(d?.bb_bp?.dia));
-    pulse.push(safeNum(d?.bb_bp?.pulse));
-    sugar.push(safeNum(d?.bb_sugar?.value));
+
+    sysData.push(safeNum(d?.bb_bp?.sys));
+    diaData.push(safeNum(d?.bb_bp?.dia));
+    pulseData.push(safeNum(d?.bb_bp?.pulse));
+    sugarData.push(safeNum(d?.bb_sugar?.value));
   });
 
-  if(bpChart)bpChart.destroy();
-  if(sugarChart)sugarChart.destroy();
+  if(bpChart) bpChart.destroy();
+  if(sugarChart) sugarChart.destroy();
 
-  bpChart=new Chart(document.getElementById("bpChart"),{
+  bpChart = new Chart(document.getElementById("bpChart"),{
     type:"line",
     data:{
       labels,
       datasets:[
-        {label:"Systolic",data:sys},
-        {label:"Diastolic",data:dia},
-        {label:"Pulse",data:pulse}
+        { label:"Systolic", data: sysData },
+        { label:"Diastolic", data: diaData },
+        { label:"Pulse", data: pulseData }
       ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:true}}
     }
   });
 
-  sugarChart=new Chart(document.getElementById("sugarChart"),{
+  sugarChart = new Chart(document.getElementById("sugarChart"),{
     type:"line",
     data:{
       labels,
-      datasets:[{label:"Sugar",data:sugar}]
+      datasets:[
+        { label:"Sugar", data: sugarData }
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:true}}
     }
   });
 }
 
-/* ================= EXPORT ================= */
+/* ================= PDF EXPORT ================= */
+
+async function fetchDayDoc(date){
+  const doc = await db.collection("boards").doc(BOARD_ID).collection("days").doc(date).get();
+  return { date, data: doc.exists ? doc.data() : {} };
+}
+
+function buildDayTableHTML(dayObj){
+  const date = dayObj.date;
+  const data = dayObj.data || {};
+  const c = calcCompletionForDate(data, date);
+
+  let html = `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h3 style="margin:0;">${date}</h3>
+        <span class="badge">${c.percent}% complete</span>
+      </div>
+      <div class="small">Done: ${c.done} / ${c.total}</div>
+      <hr/>
+  `;
+
+  const comments = (data && data.__comments) ? String(data.__comments) : "";
+  if(comments.trim()){
+    html += `<div style="margin-bottom:12px;">
+      <div style="font-weight:900;margin-bottom:6px;">Comments</div>
+      <div style="white-space:pre-wrap;border:1px solid #ddd;border-radius:10px;padding:10px;">${escapeHtml(comments)}</div>
+    </div>`;
+  }
+
+  blocks.forEach(block=>{
+    const tasks = visibleTasksForDate(block, date);
+
+    html += `<h4 style="margin:10px 0 6px;">${block.title}</h4>`;
+    html += `<table><tr><th>Task</th><th>Status</th><th>Reading</th></tr>`;
+
+    tasks.forEach(t=>{
+      const entry = data?.[t.id] || {};
+      const status = entry.done ? "Done" : "Not done";
+
+      let reading = "";
+      if(t.type === "bp"){
+        if(entry.sys && entry.dia){
+          reading = `${entry.sys}/${entry.dia}`;
+          if(entry.pulse) reading += ` (Pulse ${entry.pulse})`;
+        }
+      } else if(t.type === "sugar"){
+        if(entry.value) reading = `${entry.value}`;
+      }
+
+      html += `<tr>
+        <td>${escapeHtml(t.text)}</td>
+        <td>${status}</td>
+        <td>${escapeHtml(reading)}</td>
+      </tr>`;
+    });
+
+    html += `</table>`;
+  });
+
+  html += `</div>`;
+  return html;
+}
 
 async function exportSelectedDayPDF(){
-  const doc=await activeDocRef.get();
-  const days=[{date:selectedDate,data:doc.data()||{}}];
-  exportDays(days,"Dharini_"+selectedDate+".pdf");
+  const day = await fetchDayDoc(selectedDate);
+  await exportDaysToPDF([day], `Dharini_${selectedDate}.pdf`);
 }
 
 async function exportSelectedPlusPreviousPDF(){
-  const snap=await db.collection("boards").doc(BOARD_ID)
-    .collection("days")
+  const snap = await db.collection("boards").doc(BOARD_ID).collection("days")
     .orderBy(firebase.firestore.FieldPath.documentId())
     .endAt(selectedDate)
     .get();
 
-  const days=[];
-  snap.forEach(doc=>days.push({date:doc.id,data:doc.data()}));
-  exportDays(days,"Dharini_Upto_"+selectedDate+".pdf");
+  const days = [];
+  snap.forEach(doc => days.push({ date: doc.id, data: doc.data() }));
+
+  await exportDaysToPDF(days, `Dharini_Upto_${selectedDate}.pdf`);
 }
 
 async function exportLastNDaysPDF(n){
-  const snap=await db.collection("boards").doc(BOARD_ID)
-    .collection("days")
+  const snap = await db.collection("boards").doc(BOARD_ID).collection("days")
     .orderBy(firebase.firestore.FieldPath.documentId())
     .limitToLast(n)
     .get();
 
-  const days=[];
-  snap.forEach(doc=>days.push({date:doc.id,data:doc.data()}));
-  exportDays(days,"Dharini_Last_"+n+"_Days.pdf");
+  const days = [];
+  snap.forEach(doc => days.push({ date: doc.id, data: doc.data() }));
+
+  const first = days.length ? days[0].date : "start";
+  await exportDaysToPDF(days, `Dharini_${first}_to_${selectedDate}_Last${n}.pdf`);
 }
 
-function exportDays(days,filename){
+async function exportDaysToPDF(days, filename){
+  const container = document.getElementById("pdfContainer");
+  container.innerHTML = "";
 
-  const container=document.getElementById("pdfContainer");
-  container.innerHTML="";
+  const wrap = document.createElement("div");
+  wrap.className = "pdfWrap";
 
-  const wrap=document.createElement("div");
-  wrap.className="pdfWrap";
+  wrap.innerHTML = `
+    <h2 style="margin-top:0;">Dharini Checklist Report</h2>
+    <div class="small">Generated: ${new Date().toLocaleString()}</div>
+    <div class="small">Report includes: ${days.length} day(s)</div>
+    <hr/>
+  `;
 
-  wrap.innerHTML=`<h2>Dharini Checklist Report</h2>
-  <div>Generated: ${new Date().toLocaleString()}</div><hr/>`;
-
-  days.forEach(day=>{
-    wrap.innerHTML+=`<h3>${day.date}</h3>
-    <div>Comments: ${day.data?.__comments||""}</div><hr/>`;
-  });
+  for(const day of days){
+    wrap.innerHTML += buildDayTableHTML(day);
+  }
 
   container.appendChild(wrap);
 
-  html2pdf().from(wrap).save(filename);
+  const opt = {
+    margin:       10,
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.95 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak:    { mode: ['css', 'legacy'] }
+  };
+
+  await html2pdf().set(opt).from(wrap).save();
 }
 
 /* ================= BOOT ================= */
 
-document.getElementById("datePicker").onchange=e=>{
-  selectedDate=e.target.value;
+document.getElementById("datePicker").onchange = e=>{
+  selectedDate = e.target.value;
   loadDay();
 };
 
+wireCommentsAutosave();
 loadDay();
-
 </script>
 
 </body>
