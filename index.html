@@ -17,24 +17,6 @@
 
 <style>
 :root{
-
-  /* Prevent 100% width inputs from overflowing cards (iOS especially) */
-* { box-sizing: border-box; }
-
-  #dayComments{
-  width: 100%;
-  box-sizing: border-box;
-  display: block;
-}
-  .chartWrap{
-  height: 260px;          /* change to 220/300 if you want */
-  width: 100%;
-}
-canvas{
-  width: 100% !important;
-  height: 100% !important;
-  display: block;
-}
   --bg:#f6f7fb;
   --card:#ffffff;
   --text:#0f172a;
@@ -74,37 +56,51 @@ html[data-theme="dark"]{
   --ok:#44d07f;
 }
 
+/* Prevent 100% width inputs from overflowing cards (iOS especially) */
+*{ box-sizing:border-box; }
+
 body{font-family:system-ui;background:var(--bg);color:var(--text);margin:0;padding:16px}
 h2{margin:0 0 12px 0}
 .nav{margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:var(--shadow);border:1px solid var(--borderSoft)}
 .blockTitle{font-weight:900;margin-bottom:10px}
 .task{margin-bottom:12px}
+
 input,textarea,select{
   padding:10px;border-radius:10px;border:1px solid var(--border);
   margin:4px;background:var(--inputBg);color:var(--text);font-size:16px
 }
 input::placeholder, textarea::placeholder{color:var(--muted)}
+
+#dayComments{
+  width:100%;
+  display:block;
+}
+
 button,.btn{
   padding:10px 14px;border-radius:10px;border:0;background:var(--primary);
   color:var(--btnText);font-weight:800;display:inline-block;text-decoration:none
 }
 button.ghost,.btn.ghost{background:var(--ghostBg);color:var(--ghostText)}
 button:disabled{opacity:.55}
+
 .progress{
   height:8px;
   background:var(--progressBg);
   border-radius:999px;
   overflow:hidden;
-  margin:12px 0 6px 0;  /* top right bottom left */
+  margin:12px 0 6px 0;
 }
 .progress div{height:100%;background:var(--progressFill);width:0%}
+
 .small{font-size:12px;color:var(--muted)}
 .rowActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
 #percent{
   margin-bottom:14px;
   font-weight:600;
 }
+
 .themeBtn{
   display:inline-flex;align-items:center;gap:8px;
   padding:10px 14px;border-radius:10px;border:1px solid var(--borderSoft);
@@ -129,15 +125,15 @@ button:disabled{opacity:.55}
 .readingTag.warn{border-color:rgba(180,83,9,.35);color:var(--warn)}
 .readingTag.ok{border-color:rgba(15,157,88,.35);color:var(--ok)}
 
+/* Chart sizing (critical for iPhone Safari) */
 .chartWrap{
-  width: 100%;
-  height: 260px; /* increase to 300 if you want bigger */
+  width:100%;
+  height:260px;
 }
-
 .chartWrap canvas{
-  width: 100% !important;
-  height: 100% !important;
-  display: block;
+  width:100% !important;
+  height:100% !important;
+  display:block;
 }
 </style>
 </head>
@@ -185,18 +181,19 @@ button:disabled{opacity:.55}
     </select>
     <span class="small">Shows the selected slot across the last 30 days.</span>
   </div>
-  
-<div id="trendsStatus" class="small" style="margin:6px 0 10px 0;"></div>
 
-<div class="chartWrap">
-  <canvas id="bpChart"></canvas>
-</div>
+  <div id="trendsStatus" class="small" style="margin:6px 0 10px 0;"></div>
 
-<div style="height:12px"></div>
+  <div class="chartWrap">
+    <canvas id="bpChart"></canvas>
+  </div>
 
-<div class="chartWrap">
-  <canvas id="sugarChart"></canvas>
-</div>
+  <div style="height:12px"></div>
+
+  <div class="chartWrap">
+    <canvas id="sugarChart"></canvas>
+  </div>
+</div> <!-- CLOSE Trends card -->
 
 <div class="card">
   <h3 style="margin:0 0 8px 0;">Export</h3>
@@ -613,7 +610,7 @@ function render(data){
 
   const percent = total ? Math.round((done/total)*100) : 0;
   document.getElementById("bar").style.width = percent + "%";
- document.getElementById("percent").textContent = percent + "% Complete";
+  document.getElementById("percent").textContent = percent + "% Complete";
 }
 
 /* ================= COMMENTS ================= */
@@ -675,7 +672,6 @@ async function loadTrends(){
   try{
     setStatus("");
 
-    // Confirm Chart.js actually loaded
     if(typeof Chart === "undefined"){
       setStatus("Trends error: Chart.js did not load.");
       return;
@@ -684,13 +680,12 @@ async function loadTrends(){
     const slot = document.getElementById("slotSelect") ? document.getElementById("slotSelect").value : "bb";
     const ids = slotToIds(slot);
 
-    // Fetch last 30 day docs (works even if some days are missing)
     const snapshot = await db.collection("boards")
-  .doc(BOARD_ID)
-  .collection("days")
-  .orderBy(firebase.firestore.FieldPath.documentId(), "desc")
-  .limit(30)
-  .get();
+      .doc(BOARD_ID)
+      .collection("days")
+      .orderBy(firebase.firestore.FieldPath.documentId(), "desc")
+      .limit(30)
+      .get();
 
     const labels = [];
     const sysData = [];
@@ -706,27 +701,25 @@ async function loadTrends(){
       diaData.push(safeNum(d?.[ids.bp]?.dia));
       pulseData.push(safeNum(d?.[ids.bp]?.pulse));
       sugarData.push(safeNum(d?.[ids.sugar]?.value));
-
-      labels.reverse();
-sysData.reverse();
-diaData.reverse();
-pulseData.reverse();
-sugarData.reverse();
     });
 
-    // If nothing at all, still render empty charts and show a hint
+    // Oldest → newest
+    labels.reverse();
+    sysData.reverse();
+    diaData.reverse();
+    pulseData.reverse();
+    sugarData.reverse();
+
     if(labels.length === 0){
       setStatus("No data yet. Add readings to see trends.");
     }
 
-    // Destroy previous charts safely
     if(bpChart){ bpChart.destroy(); bpChart = null; }
     if(sugarChart){ sugarChart.destroy(); sugarChart = null; }
 
     const textCol = chartTextColor();
     const gridCol = chartGridColor();
 
-    // Use 2D contexts (more reliable on iOS)
     const bpCtx = document.getElementById("bpChart").getContext("2d");
     const sugarCtx = document.getElementById("sugarChart").getContext("2d");
 
@@ -779,20 +772,6 @@ sugarData.reverse();
 
 /* ================= EXPORT ================= */
 
-const BP_SLOTS = [
-  { label: "Before Breakfast", id: "bb_bp" },
-  { label: "Before Lunch", id: "bl_bp" },
-  { label: "Before Dinner", id: "bd_bp" },
-  { label: "2 Hours After Dinner", id: "2h_bp" }
-];
-
-const SUGAR_SLOTS = [
-  { label: "Before Breakfast", id: "bb_sugar" },
-  { label: "Before Lunch", id: "bl_sugar" },
-  { label: "Before Dinner", id: "bd_sugar" },
-  { label: "2 Hours After Dinner", id: "2h_sugar" }
-];
-
 function formatISTNow(){
   return new Date().toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -842,7 +821,6 @@ async function exportToPDF(){
     const days = [];
     snap.forEach(doc => days.push({ date: doc.id, data: doc.data() || {} }));
 
-    // Ensure selectedDate exists in output even if no doc yet
     if(!days.find(d => d.date === selectedDate)){
       days.push({ date: selectedDate, data: {} });
     }
@@ -861,7 +839,6 @@ async function exportToPDF(){
 
     const dash = "—";
 
-    // Header (first page)
     doc.setFontSize(16);
     doc.text("Dharini Checklist Report", marginX, 50);
 
@@ -871,7 +848,6 @@ async function exportToPDF(){
 
     let y = 110;
 
-    // The 4 checkpoints exactly like your screenshot
     const ROWS = [
       { label: "Before Breakfast",      bpId: "bb_bp", sugarId: "bb_sugar" },
       { label: "Before Lunch",          bpId: "bl_bp", sugarId: "bl_sugar" },
@@ -881,7 +857,7 @@ async function exportToPDF(){
 
     function bpCell(data, bpId){
       const entry = data?.[bpId] || {};
-      const s = getBPString(entry); // uses format like 128/82 (Pulse 74)
+      const s = getBPString(entry);
       return s ? s : dash;
     }
 
@@ -901,7 +877,6 @@ async function exportToPDF(){
     for(const day of days){
       ensureSpace(240);
 
-      // Date label + value (like screenshot)
       doc.setFontSize(12);
       doc.text("Date", marginX, y);
       y += 18;
@@ -943,7 +918,6 @@ async function exportToPDF(){
 
       y = doc.lastAutoTable.finalY + 18;
 
-      // Comments always, even if empty
       ensureSpace(90);
       doc.setFontSize(12);
       doc.text("Comments:", marginX, y);
