@@ -666,23 +666,25 @@ function slotToIds(slot){
 
 // Build last N dates ending at selectedDate, as YYYY-MM-DD strings
 function lastNDates(endDateStr, n){
-  const MIN_DATE = "2026-02-14"; // chart must not go before this
-  const out = [];
+  const MIN_DATE = EXPORT_START_DATE; // "2026-02-14"
 
   const end = new Date(endDateStr + "T00:00:00");
   const min = new Date(MIN_DATE + "T00:00:00");
 
-  for(let i = n - 1; i >= 0; i--){
-    const d = new Date(end);
-    d.setDate(end.getDate() - i);
+  // start = end - (n-1) days, but never before MIN_DATE
+  const start = new Date(end);
+  start.setDate(end.getDate() - (n - 1));
+  if(start < min) start.setTime(min.getTime());
 
-    if(d < min) continue; // skip anything before Feb 14
+  const out = [];
+  const cur = new Date(start);
 
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-
+  while(cur <= end){
+    const yyyy = cur.getFullYear();
+    const mm = String(cur.getMonth() + 1).padStart(2, "0");
+    const dd = String(cur.getDate()).padStart(2, "0");
     out.push(`${yyyy}-${mm}-${dd}`);
+    cur.setDate(cur.getDate() + 1);
   }
 
   return out;
