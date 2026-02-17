@@ -681,11 +681,11 @@ async function loadTrends(){
     const ids = slotToIds(slot);
 
     const snapshot = await db.collection("boards")
-      .doc(BOARD_ID)
-      .collection("days")
-      .orderBy(firebase.firestore.FieldPath.documentId(), "desc")
-      .limit(30)
-      .get();
+  .doc(BOARD_ID)
+  .collection("days")
+  .orderBy(firebase.firestore.FieldPath.documentId())
+  .limitToLast(30)
+  .get();
 
     const labels = [];
     const sysData = [];
@@ -702,13 +702,6 @@ async function loadTrends(){
       pulseData.push(safeNum(d?.[ids.bp]?.pulse));
       sugarData.push(safeNum(d?.[ids.sugar]?.value));
     });
-
-    // Oldest → newest
-    labels.reverse();
-    sysData.reverse();
-    diaData.reverse();
-    pulseData.reverse();
-    sugarData.reverse();
 
     if(labels.length === 0){
       setStatus("No data yet. Add readings to see trends.");
