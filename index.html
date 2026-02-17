@@ -652,7 +652,6 @@ function wireCommentsAutosave(){
     }, 400);
   });
 }
-
 /* ================= TRENDS ================= */
 
 let bpChart = null;
@@ -663,6 +662,21 @@ function slotToIds(slot){
   if(slot === "bl") return { bp:"bl_bp", sugar:"bl_sugar" };
   if(slot === "bd") return { bp:"bd_bp", sugar:"bd_sugar" };
   return { bp:"2h_bp", sugar:"2h_sugar" };
+}
+
+// Build last N dates ending at selectedDate, as YYYY-MM-DD strings
+function lastNDates(endDateStr, n){
+  const out = [];
+  const d = new Date(endDateStr + "T00:00:00");
+  for(let i = n - 1; i >= 0; i--){
+    const x = new Date(d);
+    x.setDate(d.getDate() - i);
+    const yyyy = x.getFullYear();
+    const mm = String(x.getMonth() + 1).padStart(2, "0");
+    const dd = String(x.getDate()).padStart(2, "0");
+    out.push(`${yyyy}-${mm}-${dd}`);
+  }
+  return out;
 }
 
 async function loadTrends(){
@@ -680,12 +694,19 @@ async function loadTrends(){
     const slot = document.getElementById("slotSelect") ? document.getElementById("slotSelect").value : "bb";
     const ids = slotToIds(slot);
 
-    const snapshot = await db.collection("boards")
-  .doc(BOARD_ID)
-  .collection("days")
-  .orderBy(firebase.firestore.FieldPath.documentId())
-  .limitToLast(30)
-  .get();
+    // Index-free approach: read last 30 days by doc id
+    const dates = lastNDates(selectedDate, 30);
+
+    const reads = dates.map(dateStr =>
+      db.collection("boards")
+        .doc(BOARD_ID)
+        .collection("days")
+        .doc(dateStr)
+        .get()
+        .then(snap => ({ id: dateStr, data: snap.exists ? (snap.data() || {}) : null }))
+    );
+
+    const results = await Promise.all(reads);
 
     const labels = [];
     const sysData = [];
@@ -693,18 +714,24 @@ async function loadTrends(){
     const pulseData = [];
     const sugarData = [];
 
-    snapshot.forEach(doc=>{
-      const d = doc.data() || {};
-      labels.push(doc.id);
+    results.forEach(r=>{
+      labels.push(r.id);
 
+      const d = r.data || {};
       sysData.push(safeNum(d?.[ids.bp]?.sys));
       diaData.push(safeNum(d?.[ids.bp]?.dia));
       pulseData.push(safeNum(d?.[ids.bp]?.pulse));
       sugarData.push(safeNum(d?.[ids.sugar]?.value));
     });
 
-    if(labels.length === 0){
-      setStatus("No data yet. Add readings to see trends.");
+    const hasAny =
+      sysData.some(v=>v!==null) ||
+      diaData.some(v=>v!==null) ||
+      pulseData.some(v=>v!==null) ||
+      sugarData.some(v=>v!==null);
+
+    if(!hasAny){
+      setStatus("No trend data found in the last 30 days for this slot.");
     }
 
     if(bpChart){ bpChart.destroy(); bpChart = null; }
@@ -713,10 +740,15 @@ async function loadTrends(){
     const textCol = chartTextColor();
     const gridCol = chartGridColor();
 
-    const bpCtx = document.getElementById("bpChart").getContext("2d");
-    const sugarCtx = document.getElementById("sugarChart").getContext("2d");
+    const bpCanvas = document.getElementById("bpChart");
+    const sugarCanvas = document.getElementById("sugarChart");
 
-    bpChart = new Chart(bpCtx,{
+    if(!bpCanvas || !sugarCanvas){
+      setStatus("Trends error: chart canvas missing in HTML.");
+      return;
+    }
+
+    bpChart = new Chart(bpCanvas.getContext("2d"),{
       type:"line",
       data:{
         labels,
@@ -738,13 +770,11 @@ async function loadTrends(){
       }
     });
 
-    sugarChart = new Chart(sugarCtx,{
+    sugarChart = new Chart(sugarCanvas.getContext("2d"),{
       type:"line",
       data:{
         labels,
-        datasets:[
-          { label:"Sugar", data: sugarData }
-        ]
+        datasets:[ { label:"Sugar", data: sugarData } ]
       },
       options:{
         responsive:true,
@@ -762,7 +792,6 @@ async function loadTrends(){
     setStatus("Trends error: " + (e?.message || "unknown"));
   }
 }
-
 /* ================= EXPORT ================= */
 
 function formatISTNow(){
