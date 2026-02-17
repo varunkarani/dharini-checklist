@@ -780,6 +780,7 @@ async function exportToPDF(){
     const days = [];
     snap.forEach(doc => days.push({ date: doc.id, data: doc.data() || {} }));
 
+    // Ensure selectedDate exists in output even if no doc yet
     if(!days.find(d => d.date === selectedDate)){
       days.push({ date: selectedDate, data: {} });
     }
@@ -791,9 +792,14 @@ async function exportToPDF(){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
 
-    const pageWidth = doc.internal.pageSize.getWidth();
     const marginX = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const usableWidth = pageWidth - marginX*2;
 
+    const dash = "—";
+
+    // Header (first page)
     doc.setFontSize(16);
     doc.text("Dharini Checklist Report", marginX, 50);
 
@@ -803,63 +809,91 @@ async function exportToPDF(){
 
     let y = 110;
 
-    for(let i=0; i<days.length; i++){
-      const day = days[i];
-      const data = day.data || {};
+    // The 4 checkpoints exactly like your screenshot
+    const ROWS = [
+      { label: "Before Breakfast",      bpId: "bb_bp", sugarId: "bb_sugar" },
+      { label: "Before Lunch",          bpId: "bl_bp", sugarId: "bl_sugar" },
+      { label: "Before Dinner",         bpId: "bd_bp", sugarId: "bd_sugar" },
+      { label: "2 Hours After Dinner",  bpId: "2h_bp", sugarId: "2h_sugar" }
+    ];
 
-      if(y > 740){
+    function bpCell(data, bpId){
+      const entry = data?.[bpId] || {};
+      const s = getBPString(entry); // uses format like 128/82 (Pulse 74)
+      return s ? s : dash;
+    }
+
+    function sugarCell(data, sugarId){
+      const entry = data?.[sugarId] || {};
+      const s = getSugarString(entry);
+      return s ? s : dash;
+    }
+
+    function ensureSpace(minSpace){
+      if(y + minSpace > pageHeight - 50){
         doc.addPage();
-        y = 50;
+        y = 60;
       }
+    }
+
+    for(const day of days){
+      ensureSpace(240);
+
+      // Date label + value (like screenshot)
+      doc.setFontSize(12);
+      doc.text("Date", marginX, y);
+      y += 18;
 
       doc.setFontSize(14);
       doc.text(day.date, marginX, y);
       y += 10;
 
+      const data = day.data || {};
+      const body = ROWS.map(r => ([
+        r.label,
+        bpCell(data, r.bpId),
+        sugarCell(data, r.sugarId)
+      ]));
+
+      doc.autoTable({
+        startY: y + 8,
+        head: [["", "Blood Pressure", "Sugar"]],
+        body,
+        theme: "grid",
+        styles: {
+          fontSize: 11,
+          cellPadding: 10,
+          overflow: "linebreak",
+          valign: "middle"
+        },
+        headStyles: {
+          fillColor: [245, 245, 245],
+          textColor: 20,
+          fontStyle: "bold"
+        },
+        columnStyles: {
+          0: { cellWidth: usableWidth * 0.34 },
+          1: { cellWidth: usableWidth * 0.33 },
+          2: { cellWidth: usableWidth * 0.33 }
+        },
+        margin: { left: marginX, right: marginX }
+      });
+
+      y = doc.lastAutoTable.finalY + 18;
+
+      // Comments always, even if empty
+      ensureSpace(90);
+      doc.setFontSize(12);
+      doc.text("Comments:", marginX, y);
+
       const comments = (data.__comments || "").trim();
-      doc.setFontSize(10);
-      if(comments){
-        const lines = doc.splitTextToSize(`Comments: ${comments}`, pageWidth - marginX*2);
-        doc.text(lines, marginX, y + 16);
-        y += 16 + lines.length * 12;
-      } else {
-        doc.text("Comments: —", marginX, y + 16);
-        y += 34;
-      }
+      const commentText = comments ? comments : dash;
 
-      const bpRows = BP_SLOTS.map(s => {
-        const entry = data[s.id] || {};
-        return [ s.label, entry.done ? "Done" : "", getBPString(entry) || "—" ];
-      });
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(commentText, usableWidth);
+      doc.text(lines, marginX, y + 16);
 
-      doc.autoTable({
-        startY: y,
-        head: [["BP Slot", "Done", "Reading"]],
-        body: bpRows,
-        theme: "grid",
-        styles: { fontSize: 9, cellPadding: 5 },
-        headStyles: { fillColor: [245,245,245], textColor: 20 },
-        margin: { left: marginX, right: marginX }
-      });
-
-      y = doc.lastAutoTable.finalY + 14;
-
-      const sugarRows = SUGAR_SLOTS.map(s => {
-        const entry = data[s.id] || {};
-        return [ s.label, entry.done ? "Done" : "", getSugarString(entry) || "—" ];
-      });
-
-      doc.autoTable({
-        startY: y,
-        head: [["Sugar Slot", "Done", "Reading"]],
-        body: sugarRows,
-        theme: "grid",
-        styles: { fontSize: 9, cellPadding: 5 },
-        headStyles: { fillColor: [245,245,245], textColor: 20 },
-        margin: { left: marginX, right: marginX }
-      });
-
-      y = doc.lastAutoTable.finalY + 26;
+      y = y + 16 + (lines.length * 14) + 26;
     }
 
     const filename = `Dharini_Report_${EXPORT_START_DATE}_to_${selectedDate}.pdf`;
