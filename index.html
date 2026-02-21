@@ -361,7 +361,10 @@ const blocks = [
     { id:"bb_bp", text:"Measure BP", type:"bp"},
     { id:"bb_sugar", text:"Measure Sugar", type:"sugar"},
     { id:"bb_novo10", text:"Novorapid 10u"},
-    { id:"bb_panD", text:"Pan D"}
+    // OLD:
+    // { id:"bb_panD", text:"Pan D"}
+    // NEW:
+    { id:"bb_panD", text:"Pan D", show:(d)=> d < "2026-02-21" }
   ]
 },
 {
@@ -372,10 +375,16 @@ const blocks = [
     { id:"ab_metxl", text:"Met XL"},
     { id:"ab_nikoran", text:"Nikoran"},
     { id:"ab_lasilactone", text:"Lasilactone"},
-    { id:"ab_cobadex", text:"Cobadex"},
+    // OLD:
+    // { id:"ab_cobadex", text:"Cobadex"},
+    // { id:"ab_folic", text:"Folic Acid"},
+    // { id:"ab_ivabred", text:"Ivabred"},
+    // { id:"ab_dolo", text:"Dolo (optional)"},
+    // NEW (Cobadex + Dolo hidden on/after 21 Feb):
+    { id:"ab_cobadex", text:"Cobadex", show:(d)=> d < "2026-02-21" },
     { id:"ab_folic", text:"Folic Acid"},
     { id:"ab_ivabred", text:"Ivabred"},
-    { id:"ab_dolo", text:"Dolo (optional)"},
+    { id:"ab_dolo", text:"Dolo (optional)", show:(d)=> d < "2026-02-21" },
     { id:"ab_vitd", text:"Vit D (Sunday only)", show:(d)=>isSunday(d)}
   ]
 },
@@ -423,7 +432,10 @@ const blocks = [
     { id:"2h_sugar", text:"Measure Sugar", type:"sugar"},
     { id:"2h_tresiba", text:"Tresiba 16u"},
     { id:"2h_rosuva", text:"Rosuvastatin"},
-    { id:"2h_dolo", text:"Dolo (optional)"}
+    // OLD:
+    // { id:"2h_dolo", text:"Dolo (optional)"}
+    // NEW:
+    { id:"2h_dolo", text:"Dolo (optional)", show:(d)=> d < "2026-02-21" }
   ]
 }
 ];
@@ -443,6 +455,7 @@ function calcCompletionForDate(data, date){
   const percent = total ? Math.round((done/total)*100) : 0;
   return { total, done, percent };
 }
+
 
 /* ================= LOAD DAY ================= */
 
