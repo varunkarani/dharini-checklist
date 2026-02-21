@@ -360,10 +360,7 @@ const blocks = [
   tasks:[
     { id:"bb_bp", text:"Measure BP", type:"bp"},
     { id:"bb_sugar", text:"Measure Sugar", type:"sugar"},
-    { id:"bb_novo10", text:"Novorapid 10u"},
-    // OLD:
-    // { id:"bb_panD", text:"Pan D"}
-    // NEW:
+    { id:"bb_novo10", text:"Novorapid 10u", type:"novo"},
     { id:"bb_panD", text:"Pan D", show:(d)=> d < "2026-02-21" }
   ]
 },
@@ -388,7 +385,7 @@ const blocks = [
   tasks:[
     { id:"bl_bp", text:"Measure BP", type:"bp"},
     { id:"bl_sugar", text:"Measure Sugar", type:"sugar"},
-    { id:"bl_novo12", text:"Novorapid 12u"}
+    { id:"bl_novo12", text:"Novorapid 12u", type:"novo"},
   ]
 },
 {
@@ -405,7 +402,7 @@ const blocks = [
   tasks:[
     { id:"bd_bp", text:"Measure BP", type:"bp"},
     { id:"bd_sugar", text:"Measure Sugar", type:"sugar"},
-    { id:"bd_novo7", text:"Novorapid 7u"}
+    { id:"bd_novo7",  text:"Novorapid 7u",  type:"novo"},
   ]
 },
 {
@@ -510,7 +507,11 @@ function render(data){
       };
 
       row.appendChild(cb);
-      row.append(" " + task.text);
+      let labelText = task.text;
+      if (task.type === "novo" && selectedDate >= "2026-02-18") {
+        labelText = "Novorapid";
+      }
+      row.append(" " + labelText);
 
       if(task.type === "bp"){
         const st = bpStatus(data?.[task.id]);
@@ -608,7 +609,38 @@ function render(data){
         row.appendChild(document.createElement("br"));
         row.appendChild(wrap);
       }
+      // Novorapid variable units - only from 18 Feb 2026 onwards
+      if (task.type === "novo" && selectedDate >= "2026-02-18") {
+        const unitsInput = document.createElement("input");
+        unitsInput.placeholder = "Units";
+        unitsInput.value = data?.[task.id]?.units || "";
+        unitsInput.inputMode = "numeric";
+        unitsInput.type = "number";
+        unitsInput.min = "0";
+        unitsInput.max = "99";
+        unitsInput.className = "narrow";
 
+        const saveNovo = document.createElement("button");
+        saveNovo.textContent = "Save";
+        saveNovo.onclick = () => {
+          activeDocRef.set({
+            [task.id]: {
+              ...data?.[task.id],
+              done: true,
+              units: unitsInput.value
+            }
+          }, { merge:true });
+          updateLastEdited();
+        };
+
+        const wrap = document.createElement("div");
+        wrap.className = "bigInputs";
+        wrap.appendChild(unitsInput);
+        wrap.appendChild(saveNovo);
+
+        row.appendChild(document.createElement("br"));
+        row.appendChild(wrap);
+      }
       card.appendChild(row);
     });
 
